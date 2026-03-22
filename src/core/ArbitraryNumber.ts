@@ -2,7 +2,6 @@ import { scientificNotation } from "../plugin/ScientificNotation";
 import { ScientificNotation } from "../types/core";
 import { NotationPlugin } from "../types/plugin";
 import { ArbitraryNumberArithmetic } from "../utility/ArbitraryNumberArithmetic";
-import { ArbitraryNumberGuard } from "../utility/ArbitraryNumberGuard";
 
 export class ArbitraryNumber implements ScientificNotation {
     public readonly coefficient: number;
@@ -15,16 +14,17 @@ export class ArbitraryNumber implements ScientificNotation {
     public static readonly Ten = new ArbitraryNumber(1, 1);
 
     public constructor(coefficient: number, exponent: number) {
-        this.coefficient = coefficient;
-        this.exponent = exponent;
+        const normalized = ArbitraryNumberArithmetic.normalize({ coefficient, exponent });
+        this.coefficient = normalized.coefficient;
+        this.exponent = normalized.exponent;
     }
 
     public add(other: ArbitraryNumber): ArbitraryNumber {
-        if (ArbitraryNumberGuard.isZero(this)) {
+        if (this.coefficient === 0) {
             return other;
         }
 
-        if (ArbitraryNumberGuard.isZero(other)) {
+        if (other.coefficient === 0) {
             return this;
         }
 
@@ -39,8 +39,7 @@ export class ArbitraryNumber implements ScientificNotation {
         }
 
         const summed = ArbitraryNumberArithmetic.alignedSum(this, other, exponentDiff);
-        const normalized = ArbitraryNumberArithmetic.normalize(summed);
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(summed.coefficient, summed.exponent);
     }
 
     public sub(other: ArbitraryNumber): ArbitraryNumber {
@@ -48,29 +47,25 @@ export class ArbitraryNumber implements ScientificNotation {
     }
 
     public mul(other: ArbitraryNumber): ArbitraryNumber {
-        if (ArbitraryNumberGuard.isZero(this) || ArbitraryNumberGuard.isZero(other)) {
+        if (this.coefficient === 0 || other.coefficient === 0) {
             return ArbitraryNumber.Zero;
         }
 
-        const normalized = ArbitraryNumberArithmetic.normalize({
-            coefficient: this.coefficient * other.coefficient,
-            exponent: this.exponent + other.exponent,
-        });
-
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(
+            this.coefficient * other.coefficient,
+            this.exponent + other.exponent,
+        );
     }
 
     public div(other: ArbitraryNumber): ArbitraryNumber {
-        if (ArbitraryNumberGuard.isZero(other)) {
+        if (other.coefficient === 0) {
             throw new Error("Division by zero");
         }
 
-        const normalized = ArbitraryNumberArithmetic.normalize({
-            coefficient: this.coefficient / other.coefficient,
-            exponent: this.exponent - other.exponent,
-        });
-
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(
+            this.coefficient / other.coefficient,
+            this.exponent - other.exponent,
+        );
     }
 
     public pow(n: number): ArbitraryNumber {
@@ -78,16 +73,14 @@ export class ArbitraryNumber implements ScientificNotation {
             return ArbitraryNumber.One;
         }
 
-        if (ArbitraryNumberGuard.isZero(this)) {
+        if (this.coefficient === 0) {
             return ArbitraryNumber.Zero;
         }
 
-        const normalized = ArbitraryNumberArithmetic.normalize({
-            coefficient: Math.pow(this.coefficient, n),
-            exponent: this.exponent * n,
-        });
-
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(
+            Math.pow(this.coefficient, n),
+            this.exponent * n,
+        );
     }
 
     public compareTo(other: ArbitraryNumber): number {
@@ -115,7 +108,7 @@ export class ArbitraryNumber implements ScientificNotation {
     }
 
     public floor(): ArbitraryNumber {
-        if (ArbitraryNumberGuard.isZero(this)) {
+        if (this.coefficient === 0) {
             return ArbitraryNumber.Zero;
         }
 
@@ -127,13 +120,11 @@ export class ArbitraryNumber implements ScientificNotation {
             return this.coefficient >= 0 ? ArbitraryNumber.Zero : new ArbitraryNumber(-1, 0);
         }
 
-        const value = Math.floor(this.coefficient * (10 ** this.exponent));
-        const normalized = ArbitraryNumberArithmetic.normalize({ coefficient: value, exponent: 0 });
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(Math.floor(this.coefficient * (10 ** this.exponent)), 0);
     }
 
     public ceil(): ArbitraryNumber {
-        if (ArbitraryNumberGuard.isZero(this)) {
+        if (this.coefficient === 0) {
             return ArbitraryNumber.Zero;
         }
 
@@ -145,9 +136,7 @@ export class ArbitraryNumber implements ScientificNotation {
             return this.coefficient > 0 ? ArbitraryNumber.One : ArbitraryNumber.Zero;
         }
 
-        const value = Math.ceil(this.coefficient * (10 ** this.exponent));
-        const normalized = ArbitraryNumberArithmetic.normalize({ coefficient: value, exponent: 0 });
-        return new ArbitraryNumber(normalized.coefficient, normalized.exponent);
+        return new ArbitraryNumber(Math.ceil(this.coefficient * (10 ** this.exponent)), 0);
     }
 
     public static clamp(value: ArbitraryNumber, min: ArbitraryNumber, max: ArbitraryNumber): ArbitraryNumber {
@@ -158,7 +147,7 @@ export class ArbitraryNumber implements ScientificNotation {
     }
 
     public log10(): number {
-        if (ArbitraryNumberGuard.isZero(this)) {
+        if (this.coefficient === 0) {
             throw new Error("Logarithm of zero is undefined");
         }
 

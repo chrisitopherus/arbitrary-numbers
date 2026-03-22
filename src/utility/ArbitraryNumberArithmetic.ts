@@ -1,10 +1,9 @@
-import { ArbitraryNumber } from "../core/ArbitraryNumber";
 import { ScientificNotation } from "../types/core";
 
 export class ArbitraryNumberArithmetic {
     public static normalize(number: ScientificNotation): ScientificNotation {
         if (number.coefficient === 0) {
-            return ArbitraryNumber.Zero;
+            return { coefficient: 0, exponent: 0 };
         }
 
         // determine the number of places to shift the coefficient to get a single digit before the decimal point
@@ -27,7 +26,7 @@ export class ArbitraryNumberArithmetic {
         return { coefficient, exponent };
     }
 
-    public static alignedSum(a: ArbitraryNumber, b: ArbitraryNumber, exponentDiff: number): ScientificNotation {
+    public static alignedSum(a: ScientificNotation, b: ScientificNotation, exponentDiff: number): ScientificNotation {
         const higher = exponentDiff >= 0 ? a : b;
         const lower  = exponentDiff >= 0 ? b : a;
         const shift  = Math.abs(exponentDiff);
