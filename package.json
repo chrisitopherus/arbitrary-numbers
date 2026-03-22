@@ -1,7 +1,19 @@
 {
   "name": "arbitrary-numbers",
   "version": "0.1.0",
-  "description": "A TypeScript library for arbitrary numbers",
+  "description": "Represent, manipulate, and display numbers of any magnitude — built for idle games, simulations, and scientific computing.",
+  "author": "Chris",
+  "license": "MIT",
+  "keywords": [
+    "arbitrary-numbers",
+    "big-number",
+    "large-number",
+    "scientific-notation",
+    "idle-game",
+    "incremental-game",
+    "game-math",
+    "typescript"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -13,7 +25,10 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "media",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
