@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArbitraryNumber } from "../../core/ArbitraryNumber";
+import { scientificNotation } from "../../plugin/ScientificNotation";
 import { NotationPlugin } from "../../types/plugin";
 
 // ---------------------------------------------------------------------------
@@ -891,25 +892,30 @@ describe("ArbitraryNumber", () => {
     // toString
     // -----------------------------------------------------------------------
     describe("toString", () => {
-        it("uses scientificNotation by default", () => {
-            // format(1.5, 12, 15)
-            expect(an(1.5, 12).toString()).toBe("1.500000000000000e+12");
+        it("uses scientificNotation with 2 decimal places by default", () => {
+            expect(an(1.5, 12).toString()).toBe("1.50e+12");
         });
 
-        it("Zero formats to all-zero decimal string", () => {
-            expect(ArbitraryNumber.Zero.toString()).toBe("0.000000000000000");
+        it("Zero formats to 0.00 with default decimals", () => {
+            expect(ArbitraryNumber.Zero.toString()).toBe("0.00");
         });
 
-        it("One formats to 1.000...0 (no exponent)", () => {
-            expect(ArbitraryNumber.One.toString()).toBe("1.000000000000000");
+        it("One formats without exponent part", () => {
+            expect(ArbitraryNumber.One.toString()).toBe("1.00");
         });
 
         it("Ten formats with e+1", () => {
-            expect(ArbitraryNumber.Ten.toString()).toBe("1.000000000000000e+1");
+            expect(ArbitraryNumber.Ten.toString()).toBe("1.00e+1");
         });
 
         it("formats negative exponent correctly", () => {
-            expect(an(5, -1).toString()).toBe("5.000000000000000e-1");
+            expect(an(5, -1).toString()).toBe("5.00e-1");
+        });
+
+        it("decimals param overrides the default", () => {
+            expect(an(1.5, 3).toString(scientificNotation, 4)).toBe("1.5000e+3");
+            expect(an(1.5, 3).toString(scientificNotation, 0)).toBe("2e+3");
+            expect(an(1.5, 3).toString(scientificNotation, 15)).toBe("1.500000000000000e+3");
         });
 
         it("accepts a custom NotationPlugin", () => {
@@ -919,13 +925,22 @@ describe("ArbitraryNumber", () => {
             expect(an(1.5, 3).toString(custom)).toBe("1.5^3");
         });
 
-        it("passes PrecisionCutoff (15) as the decimals argument to the plugin", () => {
+        it("passes 2 as the default decimals argument to the plugin", () => {
             let captured: number | undefined;
             const spy: NotationPlugin = {
                 format: (_c, _e, d) => { captured = d; return ""; },
             };
             an(1.5, 3).toString(spy);
-            expect(captured).toBe(ArbitraryNumber.PrecisionCutoff);
+            expect(captured).toBe(2);
+        });
+
+        it("passes the explicit decimals argument to the plugin", () => {
+            let captured: number | undefined;
+            const spy: NotationPlugin = {
+                format: (_c, _e, d) => { captured = d; return ""; },
+            };
+            an(1.5, 3).toString(spy, 5);
+            expect(captured).toBe(5);
         });
 
         it("passes coefficient and exponent unchanged to the plugin", () => {

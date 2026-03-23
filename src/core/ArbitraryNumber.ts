@@ -1,5 +1,5 @@
 import { scientificNotation } from "../plugin/ScientificNotation";
-import { ScientificNotation } from "../types/core";
+import { NormalizedNumber } from "../types/core";
 import { NotationPlugin } from "../types/plugin";
 import { ArbitraryNumberArithmetic } from "../utility/ArbitraryNumberArithmetic";
 
@@ -7,16 +7,17 @@ import { ArbitraryNumberArithmetic } from "../utility/ArbitraryNumberArithmetic"
  * An immutable number with effectively unlimited range, stored as `coefficient × 10^exponent`
  * in normalised scientific notation.
  *
- * The coefficient is always in `[1, 10)` (or `0`). Precision is capped at
- * {@link PrecisionCutoff} significant digits — additions that would require more
- * precision than that are silently absorbed into the larger operand.
+ * The coefficient is always in `[1, 10)` (or `0`). Addition short-circuits when the exponent
+ * difference between operands exceeds {@link PrecisionCutoff} — the smaller value is below
+ * the precision floor of the larger and is silently discarded.
  *
  * @example
- * const a = new ArbitraryNumber(1.5, 3);  // 1500
- * const b = new ArbitraryNumber(2.5, 3);  // 2500
- * a.add(b).toString(); // "4.000000000000000e+3"
+ * const a = new ArbitraryNumber(1.5, 3);  // 1,500
+ * const b = new ArbitraryNumber(2.5, 3);  // 2,500
+ * a.add(b).toString(); // "4.00e+3"
+ * a.mul(b).toString(); // "3.75e+6"
  */
-export class ArbitraryNumber implements ScientificNotation {
+export class ArbitraryNumber implements NormalizedNumber {
     /** The significand, always in `[1, 10)` or `0`. */
     public readonly coefficient: number;
     /** The power of 10 by which the coefficient is scaled. */
@@ -371,14 +372,17 @@ export class ArbitraryNumber implements ScientificNotation {
      * Formats this number as a string using the given notation plugin.
      *
      * Defaults to {@link scientificNotation} when no plugin is provided.
+     * `decimals` controls the number of decimal places passed to the plugin and defaults to `2`.
      *
      * @example
-     * an(1.5, 3).toString();             // "1.500000000000000e+3"
-     * an(1.5, 3).toString(unitNotation); // "1.50 K"
+     * an(1.5, 3).toString();                  // "1.50e+3"
+     * an(1.5, 3).toString(unitNotation);       // "1.50 K"
+     * an(1.5, 3).toString(unitNotation, 4);    // "1.5000 K"
      *
      * @param notation - The formatting plugin to use.
+     * @param decimals - Number of decimal places to render. Defaults to `2`.
      */
-    public toString(notation: NotationPlugin = scientificNotation): string {
-        return notation.format(this.coefficient, this.exponent, ArbitraryNumber.PrecisionCutoff);
+    public toString(notation: NotationPlugin = scientificNotation, decimals = 2): string {
+        return notation.format(this.coefficient, this.exponent, decimals);
     }
 }

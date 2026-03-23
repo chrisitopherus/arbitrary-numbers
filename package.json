@@ -1,7 +1,7 @@
 {
   "name": "arbitrary-numbers",
-  "version": "0.1.0",
-  "description": "Represent, manipulate, and display numbers of any magnitude — built for idle games, simulations, and scientific computing.",
+  "version": "1.0.0",
+  "description": "Immutable arbitrary-magnitude numbers for idle games, simulations, and scientific computing. Stored as coefficient × 10^exponent with pluggable display formatting.",
   "author": "Chris",
   "license": "MIT",
   "keywords": [

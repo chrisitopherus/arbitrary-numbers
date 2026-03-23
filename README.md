@@ -12,32 +12,13 @@
 
 ---
 
-## Why?
+Numbers that don't stop at `Number.MAX_SAFE_INTEGER`.
 
-JavaScript's `number` type maxes out at `Number.MAX_SAFE_INTEGER` — roughly 9×10¹⁵. In an idle game, a simulation, or anything that compounds values over time, that ceiling is hit in minutes.
-
-`arbitrary-numbers` represents values as **coefficient × 10^exponent**, where the exponent is a plain `number` and can be as large as `Number.MAX_VALUE` (~1.8×10³⁰⁸). Arithmetic is performed symbolically, so `1×10³⁰⁰ + 1×10¹` is handled just as naturally as `100 + 10`.
-
-```
-1.500e+300  ✓      1.500e+308  ✓      1.500e+1000000  ✓
-```
+`arbitrary-numbers` represents values as **coefficient × 10^exponent** — the exponent is a plain `number` so you can go up to 10^(1.8×10³⁰⁸). Built for idle games, simulations, and anything that compounds values over time.
 
 ---
 
-## Features
-
-- **Immutable & always normalized** — every instance stores `coefficient ∈ [1, 10)` (or zero). No surprises.
-- **Full arithmetic** — `add`, `sub`, `mul`, `div`, `pow`
-- **Precision-aware addition** — values more than 15 orders of magnitude apart are merged without floating-point noise polluting the result
-- **Comparison suite** — `compareTo`, `greaterThan`, `lessThan`, `equals`, `clamp`
-- **Rounding** — `floor`, `ceil`, `log10`
-- **Pluggable display** — swap notation at call-site; `ScientificNotation` ships out of the box, custom plugins are a single method
-- **Zero runtime dependencies**
-- **Full TypeScript** — ships `.d.ts` files, no `@types/` package needed
-
----
-
-## Installation
+## Install
 
 ```sh
 npm install arbitrary-numbers
@@ -45,324 +26,235 @@ npm install arbitrary-numbers
 
 ---
 
-## Quick Start
+## Quick start
 
 ```typescript
-import { ArbitraryNumber, scientificNotation } from 'arbitrary-numbers';
+import { ArbitraryNumber, unitNotation } from 'arbitrary-numbers';
 
-const a = new ArbitraryNumber(1.5, 3);  // 1,500
-const b = new ArbitraryNumber(2.5, 6);  // 2,500,000
+const a = ArbitraryNumber.from(1_500_000);   // 1.5×10⁶
+const b = ArbitraryNumber.from(2_500);       // 2.5×10³
 
-a.add(b).toString()   // "2.501500000000000e+6"
-a.mul(b).toString()   // "3.750000000000000e+9"
-a.div(b).toString()   // "6.000000000000001e-4"
+a.add(b).toString()                // "1.50e+6"
+a.mul(b).toString()                // "3.75e+9"
+a.div(b).toString()                // "6.00e+2"
 
-// compare
-a.lessThan(b)   // true
-b.greaterThan(a) // true
-a.equals(a)      // true
+a.greaterThan(b)                   // true
+a.toString(unitNotation)           // "1.50 M"
+a.toString(unitNotation, 4)        // "1.5000 M"
 ```
 
 ---
 
-## Idle Game Example
+## Core concepts
 
-The library was designed with incremental / idle games in mind — here is a self-contained example that covers the typical patterns.
+### Normalized storage
 
-```typescript
-import { ArbitraryNumber, scientificNotation } from 'arbitrary-numbers';
-
-// ── Resources ────────────────────────────────────────────────────────────────
-
-let gold        = ArbitraryNumber.Zero;
-let goldPerSec  = ArbitraryNumber.One;      // base: 1 gold / sec
-let multiplier  = ArbitraryNumber.One;
-
-// ── Upgrades ─────────────────────────────────────────────────────────────────
-
-const UPGRADES = [
-  { label: 'Copper Pick',    cost: new ArbitraryNumber(1, 1),   mult: new ArbitraryNumber(2,   0) },
-  { label: 'Iron Mine',      cost: new ArbitraryNumber(1, 3),   mult: new ArbitraryNumber(1,   1) },
-  { label: 'Gold Refinery',  cost: new ArbitraryNumber(1, 6),   mult: new ArbitraryNumber(1,   2) },
-  { label: 'Quantum Forge',  cost: new ArbitraryNumber(1, 12),  mult: new ArbitraryNumber(1,   6) },
-  { label: 'Singularity',    cost: new ArbitraryNumber(1, 24),  mult: new ArbitraryNumber(1,  12) },
-];
-
-// ── Game loop ─────────────────────────────────────────────────────────────────
-
-function tick(deltaSeconds: number): void {
-  const earned = goldPerSec.mul(multiplier).mul(new ArbitraryNumber(deltaSeconds, 0));
-  gold = gold.add(earned);
-}
-
-// ── Upgrades ──────────────────────────────────────────────────────────────────
-
-function canAfford(cost: ArbitraryNumber): boolean {
-  return gold.greaterThan(cost) || gold.equals(cost);
-}
-
-function buyUpgrade(index: number): boolean {
-  const upgrade = UPGRADES[index];
-  if (!upgrade || !canAfford(upgrade.cost)) return false;
-
-  gold       = gold.sub(upgrade.cost);
-  multiplier = multiplier.mul(upgrade.mult);
-  return true;
-}
-
-// ── Prestige ──────────────────────────────────────────────────────────────────
-
-const PRESTIGE_THRESHOLD = new ArbitraryNumber(1, 30);  // 10^30 gold
-
-function canPrestige(): boolean {
-  return gold.greaterThan(PRESTIGE_THRESHOLD);
-}
-
-function prestige(): ArbitraryNumber {
-  // prestige bonus scales with log10 of total gold earned
-  const bonus = new ArbitraryNumber(gold.log10(), 0);
-  gold       = ArbitraryNumber.Zero;
-  multiplier = ArbitraryNumber.One;
-  return bonus;
-}
-
-// ── Display ───────────────────────────────────────────────────────────────────
-
-function render(): void {
-  console.log(`Gold:       ${gold.toString(scientificNotation)}`);
-  console.log(`Per second: ${goldPerSec.mul(multiplier).toString(scientificNotation)}`);
-  console.log(`Multiplier: ${multiplier.toString(scientificNotation)}`);
-  console.log();
-
-  for (const [i, upgrade] of UPGRADES.entries()) {
-    const affordable = canAfford(upgrade.cost) ? '✓' : '✗';
-    console.log(
-      `  [${affordable}] ${upgrade.label.padEnd(16)} ` +
-      `cost: ${upgrade.cost.toString(scientificNotation).padEnd(24)} ` +
-      `→ ×${upgrade.mult.toString(scientificNotation)}`
-    );
-  }
-
-  if (canPrestige()) {
-    console.log('\n  ★ PRESTIGE AVAILABLE');
-  }
-}
-```
-
-Sample output after a few in-game hours:
-
-```
-Gold:       2.847e+18
-Per second: 1.000e+12
-Multiplier: 1.000e+12
-
-  [✗] Copper Pick      cost: 1.000e+1             → ×2.000e+0
-  [✗] Iron Mine        cost: 1.000e+3             → ×1.000e+1
-  [✗] Gold Refinery    cost: 1.000e+6             → ×1.000e+2
-  [✓] Quantum Forge    cost: 1.000e+12            → ×1.000e+6
-  [✓] Singularity      cost: 1.000e+24            → ×1.000e+12
-```
-
----
-
-## Core Concepts
-
-### Normalized representation
-
-Every `ArbitraryNumber` is stored as:
-
-```
-value = coefficient × 10^exponent
-```
-
-where `coefficient` is always in **[1, 10)** (or exactly `0` for zero). The constructor normalizes automatically:
+Every `ArbitraryNumber` stores `coefficient ∈ [1, 10)` (or `0`). The constructor normalizes automatically:
 
 ```typescript
-new ArbitraryNumber(15000, 0)  // stored as { coefficient: 1.5,  exponent: 4 }
-new ArbitraryNumber(0.003, 0)  // stored as { coefficient: 3,    exponent: -3 }
-new ArbitraryNumber(0, 999)    // stored as { coefficient: 0,    exponent: 0 }
+new ArbitraryNumber(15000, 0)  // { coefficient: 1.5, exponent: 4 }
+new ArbitraryNumber(0.003, 0)  // { coefficient: 3,   exponent: -3 }
 ```
 
-Because every instance is canonical, **comparison is O(1)**: compare exponents first, fall through to coefficients only when equal.
+Comparison is O(1): exponent first, coefficient only when equal.
 
 ### Precision cutoff
 
-When adding two numbers whose exponents differ by more than `PrecisionCutoff` (default `15`), the smaller operand is below the precision floor of the larger one and is discarded:
+When adding two numbers whose exponents differ by more than `PrecisionCutoff` (15), the smaller operand is below the precision floor of the larger and is silently discarded:
 
 ```typescript
-const huge  = new ArbitraryNumber(1, 20);  // 10^20
-const tiny  = new ArbitraryNumber(1, 3);   //  1,000
+const huge = new ArbitraryNumber(1, 20);  // 10^20
+const tiny = new ArbitraryNumber(1, 3);   // 1,000
 
-huge.add(tiny)  // returns huge — the 1,000 is invisible at this scale
-```
-
-This matches physical intuition and prevents meaningless precision noise.
-
----
-
-## Notation Plugins
-
-`toString()` accepts any object that satisfies the `NotationPlugin` interface:
-
-```typescript
-interface NotationPlugin {
-  format(coefficient: number, exponent: number, decimals: number): string;
-}
-```
-
-The plugin receives a **normalized** coefficient (always in [1, 10)), so all display logic lives in one place with no conversion math required.
-
-### ScientificNotation (built-in)
-
-```typescript
-import { scientificNotation, ScientificNotation } from 'arbitrary-numbers';
-
-const n = new ArbitraryNumber(1.5, 12);
-
-n.toString()                      // "1.500000000000000e+12"  (default)
-n.toString(scientificNotation)    // same — scientificNotation is the default
-```
-
-### Custom notation
-
-```typescript
-import { NotationPlugin } from 'arbitrary-numbers';
-
-// Short suffix notation — K / M / B / T, then scientific
-const shortNotation: NotationPlugin = {
-  format(coefficient, exponent, _decimals) {
-    if (exponent < 3)  return (coefficient * 10 ** exponent).toFixed(0);
-
-    const tiers = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi'];
-    const tier  = Math.floor(exponent / 3);
-    const label = tiers[tier];
-
-    if (label !== undefined) {
-      const display = coefficient * 10 ** (exponent % 3);
-      return `${display.toFixed(2)}${label}`;
-    }
-
-    return `${coefficient.toFixed(2)}e+${exponent}`;
-  }
-};
-
-new ArbitraryNumber(1.5,  3).toString(shortNotation)   // "1.50K"
-new ArbitraryNumber(3.5,  6).toString(shortNotation)   // "3.50M"
-new ArbitraryNumber(1.23, 9).toString(shortNotation)   // "1.23B"
-new ArbitraryNumber(1,   18).toString(shortNotation)   // "1.00e+18"
-```
-
-### SuffixNotationBase (extend for suffix-based notations)
-
-Implement only `getSuffix(exponent)` — all the tier/remainder math is handled for you:
-
-```typescript
-import { SuffixNotationBase } from 'arbitrary-numbers';
-
-class EmojiNotation extends SuffixNotationBase {
-  private static readonly TIERS = ['', '🔥', '💥', '🌟', '🚀', '🌌'];
-
-  getSuffix(exponent: number): string {
-    const tier = Math.floor(exponent / 3);
-    return EmojiNotation.TIERS[tier] ?? `e+${exponent}`;
-  }
-}
-
-const emoji = new EmojiNotation();
-
-new ArbitraryNumber(1.5, 3).toString(emoji)   // "1.50🔥"
-new ArbitraryNumber(1.5, 6).toString(emoji)   // "1.50💥"
-new ArbitraryNumber(1.5, 9).toString(emoji)   // "1.50🌟"
+huge.add(tiny)  // returns huge — 1,000 is invisible at this scale
 ```
 
 ---
 
-## API Reference
+## API
 
-### `new ArbitraryNumber(coefficient, exponent)`
-
-Constructs and **normalizes** a new instance. `coefficient` and `exponent` can be any finite numbers; the constructor will adjust them so that `Math.abs(coefficient) ∈ [1, 10)`.
+### Constructors
 
 ```typescript
-const n = new ArbitraryNumber(1.5, 3);
-n.coefficient  // 1.5
-n.exponent     // 3
+new ArbitraryNumber(coefficient, exponent)  // normalizes on construction
+ArbitraryNumber.from(1500)                  // shorthand for plain JS numbers
 ```
 
 ### Static constants
 
-| Constant | Value | Description |
-|---|---|---|
-| `ArbitraryNumber.Zero` | `0 × 10⁰` | Additive identity |
-| `ArbitraryNumber.One` | `1 × 10⁰` | Multiplicative identity |
-| `ArbitraryNumber.Ten` | `1 × 10¹` | Ten |
-| `ArbitraryNumber.PrecisionCutoff` | `15` | Max exponent gap before addition short-circuits |
-
----
+| Constant | Value |
+|---|---|
+| `ArbitraryNumber.Zero` | `0` — additive identity |
+| `ArbitraryNumber.One` | `1` — multiplicative identity |
+| `ArbitraryNumber.Ten` | `10` |
+| `ArbitraryNumber.PrecisionCutoff` | `15` — max exponent gap before add short-circuits |
 
 ### Arithmetic
 
-#### `.add(other)` → `ArbitraryNumber`
-
-Returns `this + other`. When `|this.exponent - other.exponent| > PrecisionCutoff`, the larger operand is returned unchanged (smaller is below precision floor).
-
-#### `.sub(other)` → `ArbitraryNumber`
-
-Returns `this - other`.
-
-#### `.mul(other)` → `ArbitraryNumber`
-
-Returns `this × other`. Either operand being zero short-circuits to `ArbitraryNumber.Zero`.
-
-#### `.div(other)` → `ArbitraryNumber`
-
-Returns `this ÷ other`. Throws `"Division by zero"` when `other` is zero.
-
-#### `.pow(n)` → `ArbitraryNumber`
-
-Returns `this^n` where `n` is a plain `number`. `n === 0` always returns `One`; `Zero.pow(n)` always returns `Zero`.
-
----
+```typescript
+a.add(b)   // a + b
+a.sub(b)   // a - b
+a.mul(b)   // a × b
+a.div(b)   // a ÷ b  (throws "Division by zero")
+a.pow(n)   // aⁿ  (n can be fractional or negative)
+a.negate() // -a
+a.abs()    // |a|
+```
 
 ### Comparison
 
-#### `.compareTo(other)` → `-1 | 0 | 1`
+```typescript
+a.compareTo(b)                          // -1 | 0 | 1  (compatible with Array.sort)
+a.greaterThan(b)                        // boolean
+a.lessThan(b)                           // boolean
+a.greaterThanOrEqual(b)                 // boolean
+a.lessThanOrEqual(b)                    // boolean
+a.equals(b)                             // boolean
+ArbitraryNumber.clamp(value, min, max)  // ArbitraryNumber
+```
 
-Standard comparator. Compares exponents first, then coefficients. Suitable for use with `Array.prototype.sort`.
+### Rounding & math
 
-#### `.greaterThan(other)` → `boolean`
+```typescript
+a.floor()   // largest integer ≤ a
+a.ceil()    // smallest integer ≥ a
+a.log10()   // log₁₀(a) as a plain number (throws for zero/negative)
+```
 
-#### `.lessThan(other)` → `boolean`
+### Display
 
-#### `.equals(other)` → `boolean`
-
-#### `ArbitraryNumber.clamp(value, min, max)` → `ArbitraryNumber`
-
-Returns `value` clamped to `[min, max]`.
+```typescript
+a.toString()                     // "1.50e+6"  (scientificNotation, 2 decimals)
+a.toString(unitNotation)         // "1.50 M"
+a.toString(unitNotation, 4)      // "1.5000 M"
+a.toString(letterNotation)       // "1.50b"
+a.toString(myPlugin, 3)          // custom plugin, 3 decimal places
+```
 
 ---
 
-### Rounding
+## Notation plugins
 
-#### `.floor()` → `ArbitraryNumber`
+`toString(plugin, decimals?)` accepts any object with a `format` method.
+Three plugins are included out of the box.
 
-Returns the largest integer `≤ this`. Returns `this` unchanged when `exponent ≥ PrecisionCutoff` (value is already an integer at that scale).
+### `scientificNotation` (default)
 
-#### `.ceil()` → `ArbitraryNumber`
+```typescript
+import { scientificNotation } from 'arbitrary-numbers';
 
-Returns the smallest integer `≥ this`. Returns `this` unchanged when `exponent ≥ PrecisionCutoff`.
+new ArbitraryNumber(1.5, 3).toString()                      // "1.50e+3"
+new ArbitraryNumber(1.5, 3).toString(scientificNotation, 6) // "1.500000e+3"
+new ArbitraryNumber(1.5, 0).toString()                      // "1.50"  (no e when exponent = 0)
+```
+
+### `unitNotation` — K, M, B, T…
+
+```typescript
+import { unitNotation, UnitNotation, CLASSIC_UNITS, COMPACT_UNITS } from 'arbitrary-numbers';
+
+new ArbitraryNumber(1.5, 3).toString(unitNotation)   // "1.50 K"
+new ArbitraryNumber(3.2, 6).toString(unitNotation)   // "3.20 M"
+new ArbitraryNumber(1.0, 9).toString(unitNotation)   // "1.00 B"
+
+// Custom unit list with a different fallback:
+const compact = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation, separator: " " });
+```
+
+Numbers beyond the unit list fall back to `letterNotation` (for `unitNotation`) or `scientificNotation` (default fallback when none is configured).
+
+### `letterNotation` — a, b, c… aa, ab…
+
+```typescript
+import { letterNotation } from 'arbitrary-numbers';
+
+new ArbitraryNumber(1.5, 3).toString(letterNotation)   // "1.50a"
+new ArbitraryNumber(1.5, 6).toString(letterNotation)   // "1.50b"
+new ArbitraryNumber(1.5, 78).toString(letterNotation)  // "1.50aa"
+```
+
+Sequences never run out — single letters `a–z`, then `aa–zz`, then `aaa`, etc.
 
 ---
 
-### Other
+## Writing a custom plugin
 
-#### `.log10()` → `number`
+### Simple object
 
-Returns `log₁₀(this)`. Throws `"Logarithm of zero is undefined"` for zero. Because the value is normalized, this is simply `Math.log10(coefficient) + exponent`.
+```typescript
+import { NotationPlugin } from 'arbitrary-numbers';
 
-#### `.toString(notation?)` → `string`
+const emojiNotation: NotationPlugin = {
+  format(coefficient, exponent, decimals) {
+    const suffixes = ['', '🔥', '💥', '🌟', '🚀', '🌌'];
+    if (exponent < 3) return (coefficient * 10 ** exponent).toFixed(decimals);
 
-Formats the number using the given `NotationPlugin`. Defaults to `scientificNotation`. The `decimals` argument passed to the plugin is `ArbitraryNumber.PrecisionCutoff`.
+    const tier = Math.floor(exponent / 3);
+    const display = coefficient * 10 ** (exponent % 3);
+    return `${display.toFixed(decimals)}${suffixes[tier] ?? '∞'}`;
+  },
+};
+
+new ArbitraryNumber(1.5, 3).toString(emojiNotation)  // "1.50🔥"
+new ArbitraryNumber(1.5, 9).toString(emojiNotation)  // "1.50🌟"
+```
+
+### Extending `SuffixNotationBase`
+
+If your notation is suffix-based (number + label), extend `SuffixNotationBase` — it handles all the tier/remainder math for you. Just implement `getSuffix(tier)`:
+
+```typescript
+import { SuffixNotationBase } from 'arbitrary-numbers';
+
+class RomanNotation extends SuffixNotationBase {
+  private static readonly TIERS = ['', 'M', 'MM', 'B', 'MB', 'Q'];
+
+  getSuffix(tier: number): string {
+    return RomanNotation.TIERS[tier] ?? `e+${tier * 3}`;
+  }
+}
+
+const roman = new RomanNotation({ separator: " " });
+
+new ArbitraryNumber(1.5, 3).toString(roman)   // "1.50 M"
+new ArbitraryNumber(1.5, 6).toString(roman)   // "1.50 MM"
+```
+
+---
+
+## Idle game example
+
+```typescript
+import { ArbitraryNumber, unitNotation } from 'arbitrary-numbers';
+
+let gold       = ArbitraryNumber.Zero;
+let goldPerSec = ArbitraryNumber.One;
+let multiplier = ArbitraryNumber.One;
+
+const UPGRADES = [
+  { label: 'Copper Pick',   cost: new ArbitraryNumber(1, 1),  mult: new ArbitraryNumber(2,  0) },
+  { label: 'Iron Mine',     cost: new ArbitraryNumber(1, 3),  mult: new ArbitraryNumber(1,  1) },
+  { label: 'Gold Refinery', cost: new ArbitraryNumber(1, 6),  mult: new ArbitraryNumber(1,  2) },
+  { label: 'Quantum Forge', cost: new ArbitraryNumber(1, 12), mult: new ArbitraryNumber(1,  6) },
+];
+
+function tick(dt: number): void {
+  gold = gold.add(goldPerSec.mul(multiplier).mul(ArbitraryNumber.from(dt)));
+}
+
+function buyUpgrade(i: number): boolean {
+  const u = UPGRADES[i];
+  if (!u || gold.lessThan(u.cost)) return false;
+  gold       = gold.sub(u.cost);
+  multiplier = multiplier.mul(u.mult);
+  return true;
+}
+
+function render(): void {
+  console.log(`Gold: ${gold.toString(unitNotation)}`);
+  console.log(`/sec: ${goldPerSec.mul(multiplier).toString(unitNotation)}`);
+}
+```
 
 ---
 

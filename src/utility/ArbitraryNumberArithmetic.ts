@@ -1,24 +1,23 @@
-import { ScientificNotation } from "../types/core";
+import { NormalizedNumber } from "../types/core";
 
 /**
- * Low-level arithmetic helpers that operate directly on {@link ScientificNotation} objects.
+ * Low-level arithmetic helpers that operate on {@link NormalizedNumber} objects.
  *
- * These methods are internal building blocks used by {@link ArbitraryNumber} and are not
- * intended to be called directly by consumers of the library.
+ * These are internal building blocks used by {@link ArbitraryNumber}.
+ * They are not part of the public API and should not be called directly by consumers.
  */
 export class ArbitraryNumberArithmetic {
     /**
-     * Normalises a scientific notation value so that `1 ≤ |coefficient| < 10`
-     * (or `coefficient === 0` with `exponent === 0`).
-     *
-     * @example
-     * normalize({ coefficient: 15, exponent: 3 }); // { coefficient: 1.5, exponent: 4 }
-     * normalize({ coefficient: 0,  exponent: 9 }); // { coefficient: 0,   exponent: 0 }
+     * Normalises a value so that `1 ≤ |coefficient| < 10` (or `coefficient === 0`, `exponent === 0`).
      *
      * @param number - The value to normalise.
      * @returns A new object with the coefficient shifted into `[1, 10)`.
+     *
+     * @example
+     * normalize({ coefficient: 15,  exponent: 3 }); // { coefficient: 1.5, exponent: 4 }
+     * normalize({ coefficient: 0,   exponent: 9 }); // { coefficient: 0,   exponent: 0 }
      */
-    public static normalize(number: ScientificNotation): ScientificNotation {
+    public static normalize(number: NormalizedNumber): NormalizedNumber {
         if (number.coefficient === 0) {
             return { coefficient: 0, exponent: 0 };
         }
@@ -27,7 +26,7 @@ export class ArbitraryNumberArithmetic {
         const scale = 10 ** shift;
 
         // For subnormal floats (e.g. Number.MIN_VALUE ≈ 5e-324), 10^shift underflows to 0.
-        // The number is so small it is indistinguishable from zero at any practical precision.
+        // The value is indistinguishable from zero at any practical precision.
         if (scale === 0) {
             return { coefficient: 0, exponent: 0 };
         }
@@ -39,18 +38,24 @@ export class ArbitraryNumberArithmetic {
     }
 
     /**
-     * Adds two scientific notation values that are within precision range of each other.
+     * Adds two values that are within precision range of each other.
      *
      * The higher-exponent operand is kept as-is; the lower one is scaled down before
      * summing so both share the same exponent.
      *
+     * The result is **not** normalised — call {@link normalize} on the output.
+     *
      * @param a - First operand.
      * @param b - Second operand.
-     * @param exponentDiff - Pre-computed `a.exponent - b.exponent`. Must satisfy
-     *   `|exponentDiff| ≤ PrecisionCutoff`.
-     * @returns An unnormalised result — call {@link normalize} on the output.
+     * @param exponentDiff - Pre-computed `a.exponent - b.exponent`.
+     *   Must satisfy `|exponentDiff| ≤ PrecisionCutoff`.
+     * @returns An unnormalised sum.
+     *
+     * @example
+     * alignedSum({ coefficient: 1.5, exponent: 3 }, { coefficient: 2.5, exponent: 3 }, 0);
+     * // { coefficient: 4.0, exponent: 3 }
      */
-    public static alignedSum(a: ScientificNotation, b: ScientificNotation, exponentDiff: number): ScientificNotation {
+    public static alignedSum(a: NormalizedNumber, b: NormalizedNumber, exponentDiff: number): NormalizedNumber {
         const higher = exponentDiff >= 0 ? a : b;
         const lower  = exponentDiff >= 0 ? b : a;
         const shift  = Math.abs(exponentDiff);
@@ -64,11 +69,12 @@ export class ArbitraryNumberArithmetic {
     /**
      * Divides a coefficient by `10^places`, effectively shifting it right.
      *
-     * @example
-     * shiftCoefficientDown(1.5, 3); // 0.0015
-     *
      * @param coefficient - The value to shift.
      * @param places - Number of decimal places to shift right.
+     * @returns `coefficient / 10^places`.
+     *
+     * @example
+     * shiftCoefficientDown(1.5, 3); // 0.0015
      */
     public static shiftCoefficientDown(coefficient: number, places: number): number {
         return coefficient / (10 ** places);
@@ -77,11 +83,12 @@ export class ArbitraryNumberArithmetic {
     /**
      * Multiplies a coefficient by `10^places`, effectively shifting it left.
      *
-     * @example
-     * shiftCoefficientUp(1.5, 3); // 1500
-     *
      * @param coefficient - The value to shift.
      * @param places - Number of decimal places to shift left.
+     * @returns `coefficient * 10^places`.
+     *
+     * @example
+     * shiftCoefficientUp(1.5, 3); // 1500
      */
     public static shiftCoefficientUp(coefficient: number, places: number): number {
         return coefficient * (10 ** places);
