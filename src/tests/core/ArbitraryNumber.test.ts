@@ -40,6 +40,47 @@ describe("ArbitraryNumber", () => {
     });
 
     // -----------------------------------------------------------------------
+    // from
+    // -----------------------------------------------------------------------
+    describe("from", () => {
+        it("converts an integer", () => {
+            const n = ArbitraryNumber.from(1500);
+            expect(n.coefficient).toBeCloseTo(1.5, 10);
+            expect(n.exponent).toBe(3);
+        });
+
+        it("converts a decimal", () => {
+            const n = ArbitraryNumber.from(0.005);
+            expect(n.coefficient).toBeCloseTo(5, 10);
+            expect(n.exponent).toBe(-3);
+        });
+
+        it("converts 0 to Zero", () => {
+            const n = ArbitraryNumber.from(0);
+            expect(n.coefficient).toBe(0);
+            expect(n.exponent).toBe(0);
+        });
+
+        it("converts a negative number", () => {
+            const n = ArbitraryNumber.from(-1500);
+            expect(n.coefficient).toBeCloseTo(-1.5, 10);
+            expect(n.exponent).toBe(3);
+        });
+
+        it("throws for Infinity", () => {
+            expect(() => ArbitraryNumber.from(Infinity)).toThrow("ArbitraryNumber.from: value must be finite");
+        });
+
+        it("throws for -Infinity", () => {
+            expect(() => ArbitraryNumber.from(-Infinity)).toThrow("ArbitraryNumber.from: value must be finite");
+        });
+
+        it("throws for NaN", () => {
+            expect(() => ArbitraryNumber.from(NaN)).toThrow("ArbitraryNumber.from: value must be finite");
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // Constructor
     // -----------------------------------------------------------------------
     describe("constructor", () => {
@@ -166,6 +207,20 @@ describe("ArbitraryNumber", () => {
             const result = a.add(neg);
             expect(result.coefficient).toBe(0);
         });
+
+        it("adds two negative numbers", () => {
+            // −1.5×10³ + −2.5×10³ = −4×10³
+            const result = an(-1.5, 3).add(an(-2.5, 3));
+            expect(result.coefficient).toBeCloseTo(-4, 10);
+            expect(result.exponent).toBe(3);
+        });
+
+        it("adds a positive and a negative (positive dominates)", () => {
+            // 3×10³ + (−1×10³) = 2×10³
+            const result = an(3, 3).add(an(-1, 3));
+            expect(result.coefficient).toBeCloseTo(2, 10);
+            expect(result.exponent).toBe(3);
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -175,6 +230,13 @@ describe("ArbitraryNumber", () => {
         it("x − Zero returns the same x reference", () => {
             const x = an(1.5, 3);
             expect(x.sub(ArbitraryNumber.Zero)).toBe(x);
+        });
+
+        it("Zero − x returns the negation of x", () => {
+            // 0 − 1.5×10³ = −1.5×10³
+            const result = ArbitraryNumber.Zero.sub(an(1.5, 3));
+            expect(result.coefficient).toBeCloseTo(-1.5, 10);
+            expect(result.exponent).toBe(3);
         });
 
         it("x − x results in coefficient 0", () => {
@@ -336,6 +398,11 @@ describe("ArbitraryNumber", () => {
             expect(ArbitraryNumber.Zero.pow(100)).toBe(ArbitraryNumber.Zero);
         });
 
+        it("Zero ^ n throws for negative n (0⁻¹ is undefined)", () => {
+            expect(() => ArbitraryNumber.Zero.pow(-1)).toThrow("Zero cannot be raised to a negative power");
+            expect(() => ArbitraryNumber.Zero.pow(-3)).toThrow("Zero cannot be raised to a negative power");
+        });
+
         it("x ^ 1 returns normalized x", () => {
             const result = an(2, 3).pow(1);
             expect(result.coefficient).toBe(2);
@@ -418,6 +485,39 @@ describe("ArbitraryNumber", () => {
         it("One compared to Ten returns -1", () => {
             expect(ArbitraryNumber.One.compareTo(ArbitraryNumber.Ten)).toBe(-1);
         });
+
+        it("negative is always less than positive regardless of exponent magnitude", () => {
+            // −1×10⁴ = −10000 < 1×10³ = 1000
+            expect(an(-1, 4).compareTo(an(1, 3))).toBe(-1);
+        });
+
+        it("positive is always greater than negative regardless of exponent magnitude", () => {
+            expect(an(1, 3).compareTo(an(-1, 4))).toBe(1);
+        });
+
+        it("Zero is greater than any negative number", () => {
+            expect(ArbitraryNumber.Zero.compareTo(an(-1, 3))).toBe(1);
+        });
+
+        it("any negative number is less than Zero", () => {
+            expect(an(-1, 3).compareTo(ArbitraryNumber.Zero)).toBe(-1);
+        });
+
+        it("among two negatives, larger exponent means smaller value", () => {
+            // −1×10⁴ = −10000 < −1×10³ = −1000
+            expect(an(-1, 4).compareTo(an(-1, 3))).toBe(-1);
+        });
+
+        it("among two negatives, smaller exponent means greater value", () => {
+            // −1×10³ = −1000 > −1×10⁴ = −10000
+            expect(an(-1, 3).compareTo(an(-1, 4))).toBe(1);
+        });
+
+        it("among two negatives, same exponent compares coefficients normally", () => {
+            // −2×10³ < −1×10³
+            expect(an(-2, 3).compareTo(an(-1, 3))).toBe(-1);
+            expect(an(-1, 3).compareTo(an(-2, 3))).toBe(1);
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -435,6 +535,14 @@ describe("ArbitraryNumber", () => {
         it("returns false when smaller", () => {
             expect(an(1.5, 3).greaterThan(an(1.5, 4))).toBe(false);
         });
+
+        it("positive is greater than negative", () => {
+            expect(an(1, 3).greaterThan(an(-1, 4))).toBe(true);
+        });
+
+        it("Zero is greater than a negative number", () => {
+            expect(ArbitraryNumber.Zero.greaterThan(an(-1, 3))).toBe(true);
+        });
     });
 
     describe("lessThan", () => {
@@ -448,6 +556,14 @@ describe("ArbitraryNumber", () => {
 
         it("returns false when larger", () => {
             expect(an(1.5, 4).lessThan(an(1.5, 3))).toBe(false);
+        });
+
+        it("negative is less than positive", () => {
+            expect(an(-1, 4).lessThan(an(1, 3))).toBe(true);
+        });
+
+        it("negative is less than Zero", () => {
+            expect(an(-1, 3).lessThan(ArbitraryNumber.Zero)).toBe(true);
         });
     });
 
@@ -466,6 +582,88 @@ describe("ArbitraryNumber", () => {
 
         it("Zero equals Zero", () => {
             expect(ArbitraryNumber.Zero.equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // negate
+    // -----------------------------------------------------------------------
+    describe("negate", () => {
+        it("negates a positive number", () => {
+            const result = an(1.5, 3).negate();
+            expect(result.coefficient).toBeCloseTo(-1.5, 10);
+            expect(result.exponent).toBe(3);
+        });
+
+        it("negates a negative number back to positive", () => {
+            const result = an(-1.5, 3).negate();
+            expect(result.coefficient).toBeCloseTo(1.5, 10);
+            expect(result.exponent).toBe(3);
+        });
+
+        it("negate of Zero returns Zero", () => {
+            expect(ArbitraryNumber.Zero.negate()).toBe(ArbitraryNumber.Zero);
+        });
+
+        it("double negation returns the original value", () => {
+            const x = an(1.5, 3);
+            expect(x.negate().negate().equals(x)).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // abs
+    // -----------------------------------------------------------------------
+    describe("abs", () => {
+        it("abs of a positive number returns the same reference", () => {
+            const x = an(1.5, 3);
+            expect(x.abs()).toBe(x);
+        });
+
+        it("abs of a negative number returns the positive equivalent", () => {
+            const result = an(-1.5, 3).abs();
+            expect(result.coefficient).toBeCloseTo(1.5, 10);
+            expect(result.exponent).toBe(3);
+        });
+
+        it("abs of Zero returns Zero", () => {
+            expect(ArbitraryNumber.Zero.abs()).toBe(ArbitraryNumber.Zero);
+        });
+
+        it("abs of negate equals original", () => {
+            const x = an(1.5, 3);
+            expect(x.negate().abs().equals(x)).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // greaterThanOrEqual / lessThanOrEqual
+    // -----------------------------------------------------------------------
+    describe("greaterThanOrEqual", () => {
+        it("returns true when strictly greater", () => {
+            expect(an(1.5, 4).greaterThanOrEqual(an(1.5, 3))).toBe(true);
+        });
+
+        it("returns true when equal", () => {
+            expect(an(1.5, 3).greaterThanOrEqual(an(1.5, 3))).toBe(true);
+        });
+
+        it("returns false when smaller", () => {
+            expect(an(1.5, 3).greaterThanOrEqual(an(1.5, 4))).toBe(false);
+        });
+    });
+
+    describe("lessThanOrEqual", () => {
+        it("returns true when strictly smaller", () => {
+            expect(an(1.5, 3).lessThanOrEqual(an(1.5, 4))).toBe(true);
+        });
+
+        it("returns true when equal", () => {
+            expect(an(1.5, 3).lessThanOrEqual(an(1.5, 3))).toBe(true);
+        });
+
+        it("returns false when larger", () => {
+            expect(an(1.5, 4).lessThanOrEqual(an(1.5, 3))).toBe(false);
         });
     });
 
@@ -657,6 +855,10 @@ describe("ArbitraryNumber", () => {
 
         it("throws for any number with coefficient 0", () => {
             expect(() => an(0, 5).log10()).toThrow("Logarithm of zero is undefined");
+        });
+
+        it("throws 'Logarithm of a negative number is undefined' for negative coefficient", () => {
+            expect(() => an(-1.5, 3).log10()).toThrow("Logarithm of a negative number is undefined");
         });
 
         it("log10(One) = 0", () => {

@@ -1,5 +1,13 @@
 import { Unit } from "../types/plugin";
 
+/**
+ * Full named unit list from Thousand (10³) to Centillion (10³⁰³).
+ *
+ * Intended for use with {@link UnitNotation} when human-readable long-form names matter.
+ *
+ * @example
+ * const notation = new UnitNotation({ units: CLASSIC_UNITS });
+ */
 export const CLASSIC_UNITS: ReadonlyArray<Unit> = [
     { exponent: 3, symbol: "K", name: "Thousand" },
     { exponent: 6, symbol: "M", name: "Million" },
@@ -38,7 +46,13 @@ export const CLASSIC_UNITS: ReadonlyArray<Unit> = [
 ] as const;
 
 /**
- * Short aliases only - compact display, falls back to letter notation.
+ * Compact unit list from Thousand (10³) to Nonillion (10³⁰), using short symbols only.
+ *
+ * Intended for tight UI spaces. Numbers beyond Nonillion fall back to whatever
+ * `fallback` plugin is configured on the {@link UnitNotation} instance.
+ *
+ * @example
+ * const notation = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
  */
 export const COMPACT_UNITS: ReadonlyArray<Unit> = [
     { exponent: 3, symbol: "k" },

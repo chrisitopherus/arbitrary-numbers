@@ -12,6 +12,15 @@ describe("ArbitraryNumberArithmetic", () => {
     // normalize
     // -----------------------------------------------------------------------
     describe("normalize", () => {
+        it("subnormal coefficient (Number.MIN_VALUE) is treated as zero", () => {
+            // Number.MIN_VALUE ≈ 5e-324. Its shift is -324, so 10^shift underflows to 0,
+            // making the division produce Infinity. Without explicit handling this would
+            // loop forever — verify it returns zero instead.
+            const result = ArbitraryNumberArithmetic.normalize({ coefficient: Number.MIN_VALUE, exponent: 0 });
+            expect(result.coefficient).toBe(0);
+            expect(result.exponent).toBe(0);
+        });
+
         it("coefficient === 0 returns zero values regardless of exponent", () => {
             const result = ArbitraryNumberArithmetic.normalize({ coefficient: 0, exponent: 5 });
             expect(result.coefficient).toBe(0);

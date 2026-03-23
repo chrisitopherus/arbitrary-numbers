@@ -1,77 +1,69 @@
 /**
- * The single contract every notation plugin must satisfy.
+ * A formatting plugin that converts a normalised scientific notation number into a string.
  *
- * ArbitraryNumber knows nothing beyond this interface — all display
- * logic lives entirely inside the plugin.
+ * Implement this interface to create a custom display format and pass it to
+ * {@link ArbitraryNumber.toString}.
  *
- * @example Minimal custom plugin
- * ```ts
- * const myNotation: NotationPlugin = {
- *   format(c, e, d) {
- *     return e < 3 ? c.toFixed(d) : `${c.toFixed(d)}e+${e}`
- *   }
- * }
- * ```
+ * @example
+ * const myPlugin: NotationPlugin = {
+ *   format: (c, e, _d) => `${c}e${e}`,
+ * };
+ * number.toString(myPlugin); // "1.5e3"
  */
 export interface NotationPlugin {
     /**
-     * Format a normalized ArbitraryNumber for display.
+     * Formats a normalised scientific notation value as a string.
      *
-     * @param coefficient  Always in [1.0, 10.0) — the significand
-     * @param exponent     The power of 10 (can be astronomically large)
-     * @param decimals     How many decimal places the caller wants
-     * @returns            The human-readable string
+     * @param coefficient - The significand, always in `[1, 10)` or `0`.
+     * @param exponent - The power of 10.
+     * @param decimals - The number of decimal places to render.
      */
-    format(coefficient: number, exponent: number, decimals: number): string
+    format(coefficient: number, exponent: number, decimals: number): string;
 }
 
 /**
- * Optional extension for suffix-based notations.
- * Implement this if your plugin maps tiers to string labels.
- * Used by LetterNotation and StandardNotation — not required.
+ * A {@link NotationPlugin} that formats numbers with a human-readable suffix
+ * (e.g. `"1.50 K"`, `"3.20 M"`).
+ *
+ * Extend {@link SuffixNotationBase} to implement this interface.
  */
 export interface SuffixNotationPlugin extends NotationPlugin {
     /**
-     * Return the suffix string for a given exponent.
-     * e.g. exponent=6  → "M",  exponent=15 → "aa"
+     * Returns the suffix string for the given exponent.
+     *
+     * @param exponent - The power of 10 of the number being formatted.
      */
-    getSuffix(exponent: number): string
+    getSuffix(exponent: number): string;
+}
+
+/** Options shared by all suffix-based notation plugins. */
+export interface SuffixNotationPluginOptions {
+    /** String placed between the number and its suffix. Defaults to `" "`. */
+    separator?: string;
 }
 
 /**
- * A named unit entry. 
- * 
- * `exponent` must be a multiple of 3.
+ * A named numeric unit used by {@link UnitNotation} to map exponents to symbols.
+ *
+ * @example
+ * const million: Unit = { exponent: 6, symbol: "M", name: "Million" };
  */
 export interface Unit {
-    /** Optional long name, e.g. "Thousand", "Million" — for tooling / docs */
+    /** Full name of the unit, e.g. `"Million"`. Optional, used for display purposes only. */
     name?: string;
-    /** Short label shown after the number, e.g. "K", "M", "B" */
+    /** Short symbol displayed after the number, e.g. `"M"`. */
     symbol: string;
-    /** The power of 10 this unit represents.  Must be divisible by 3. */
+    /** The power of 10 this unit represents, e.g. `6` for one million. */
     exponent: number;
 }
 
-/**
- * Configuration for UnitNotation.
- */
-export interface UnitNotationOptions {
-  /**
-   * The ordered list of named units.
-   * Units are matched by finding the largest `unit.exponent ≤ exponent`.
-   * Any exponent beyond the last unit falls back to `fallback`.
-   */
-  units: ReadonlyArray<Unit>;
- 
-  /**
-   * What to show when the exponent exceeds all defined units.
-   */
-  fallback?: NotationPlugin;
- 
-  /**
-   * Separator between the number and its suffix.
-   * Default: `' '`  (e.g. "1.500 Million")
-   * Set to `''` for compact style (e.g. "1.500M")
-   */
-  separator?: string;
+/** Options for constructing a {@link UnitNotation} instance. */
+export interface UnitNotationOptions extends SuffixNotationPluginOptions {
+    /** Ordered list of units to match against the number's exponent. */
+    units: ReadonlyArray<Unit>;
+    /**
+     * Fallback plugin used when no unit matches the exponent.
+     * Defaults to no fallback (returns raw scientific notation).
+     */
+    fallback?: NotationPlugin;
 }
