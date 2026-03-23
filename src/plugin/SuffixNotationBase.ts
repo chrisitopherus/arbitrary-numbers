@@ -24,11 +24,11 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
     }
 
     /**
-     * Returns the suffix label for the given exponent.
+     * Returns the suffix label for the given exponent tier.
      *
-     * @param exponent - The power of 10 of the number being formatted.
+     * @param tier - The exponent tier.
      */
-    public abstract getSuffix(exponent: number): string;
+    public abstract getSuffix(tier: number): string;
 
     /**
      * Formats the number as `"<value><separator><suffix>"`.
@@ -49,7 +49,7 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
         const tier = Math.floor(exponent / 3)
         const remainder = exponent - tier * 3          // 0, 1, or 2
         const displayC = coefficient * Math.pow(10, remainder)
-        const suffix = this.getSuffix(exponent)
+        const suffix = this.getSuffix(tier);
 
         return `${displayC.toFixed(decimals)}${this.separator}${suffix}`;
     }
