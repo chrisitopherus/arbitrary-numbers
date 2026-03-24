@@ -20,25 +20,25 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
     /**
      * @param options - Plugin options. `separator` defaults to `""`.
      */
-    public constructor(options: SuffixNotationPluginOptions = { separator: "" }) {
+    public constructor(options: SuffixNotationPluginOptions = {}) {
         this.separator = options.separator ?? "";
     }
 
     /**
      * Returns the suffix label for the given tier, where `tier = floor(exponent / 3)`.
      *
-     * Tier 1 corresponds to 10³ (thousands), tier 2 to 10⁶ (millions), and so on.
-     * Tier 0 is never passed — numbers below 10³ are formatted without a suffix.
+     * Tier 0 corresponds to values below 10³ — return `""` to render with no suffix.
+     * Tier 1 = 10³, tier 2 = 10⁶, and so on.
      *
-     * @param tier - The exponent tier (`floor(exponent / 3)`), always ≥ 1.
-     * @returns The suffix string to append (e.g. `"K"`, `"a"`).
+     * @param tier - The exponent tier (`floor(exponent / 3)`), ≥ 0.
+     * @returns The suffix string (e.g. `"K"`, `"a"`), or `""` for no suffix.
      */
     public abstract getSuffix(tier: number): string;
 
     /**
-     * Formats the number as `"<value><separator><suffix>"`.
-     *
-     * Numbers with `exponent < 3` (i.e. less than 1000) are formatted without a suffix.
+     * Formats the number by combining the scaled coefficient with the suffix returned
+     * by {@link getSuffix}. When `getSuffix` returns an empty string, the separator is
+     * omitted and only the plain value is returned.
      *
      * @param coefficient - The significand in `[1, 10)` or `0`.
      * @param exponent - The power of 10.
@@ -46,15 +46,14 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
      * @returns The formatted string.
      */
     public format(coefficient: number, exponent: number, decimals: number): string {
-        if (exponent < 3) {
-            const value = coefficient * Math.pow(10, exponent);
-            return value.toFixed(decimals);
-        }
-
         const tier = Math.floor(exponent / 3);
         const remainder = exponent - tier * 3;         // 0, 1, or 2
         const displayC = coefficient * Math.pow(10, remainder);
         const suffix = this.getSuffix(tier);
+
+        if (!suffix) {
+            return displayC.toFixed(decimals);
+        }
 
         return `${displayC.toFixed(decimals)}${this.separator}${suffix}`;
     }

@@ -84,7 +84,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * operand has no effect and the larger is returned as-is.
      *
      * @example
-     * an(1.5, 3).add(an(2.5, 3)); // 4×10³
+     * new ArbitraryNumber(1.5, 3).add(new ArbitraryNumber(2.5, 3)); // 4×10³
      */
     public add(other: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -113,7 +113,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this - other`.
      *
      * @example
-     * an(3.5, 3).sub(an(1.5, 3)); // 2×10³
+     * new ArbitraryNumber(3.5, 3).sub(new ArbitraryNumber(1.5, 3)); // 2×10³
      */
     public sub(other: ArbitraryNumber): ArbitraryNumber {
         return this.add(new ArbitraryNumber(-other.coefficient, other.exponent));
@@ -123,7 +123,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this × other`.
      *
      * @example
-     * an(2, 3).mul(an(3, 4)); // 6×10⁷
+     * new ArbitraryNumber(2, 3).mul(new ArbitraryNumber(3, 4)); // 6×10⁷
      */
     public mul(other: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0 || other.coefficient === 0) {
@@ -140,7 +140,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this ÷ other`.
      *
      * @example
-     * an(6, 7).div(an(3, 4)); // 2×10³
+     * new ArbitraryNumber(6, 7).div(new ArbitraryNumber(3, 4)); // 2×10³
      *
      * @throws `"Division by zero"` when `other` is zero.
      */
@@ -159,7 +159,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns the arithmetic negation of this number (`-this`).
      *
      * @example
-     * an(1.5, 3).negate(); // −1.5×10³
+     * new ArbitraryNumber(1.5, 3).negate(); // −1.5×10³
      */
     public negate(): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -174,7 +174,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this` unchanged when the number is already non-negative.
      *
      * @example
-     * an(-1.5, 3).abs(); // 1.5×10³
+     * new ArbitraryNumber(-1.5, 3).abs(); // 1.5×10³
      */
     public abs(): ArbitraryNumber {
         if (this.coefficient >= 0) {
@@ -190,8 +190,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * `x^0` always returns {@link One}, including `0^0` (by convention).
      *
      * @example
-     * an(2, 3).pow(2);  // 4×10⁶
-     * an(2, 0).pow(-1); // 5×10⁻¹  (= 0.5)
+     * new ArbitraryNumber(2, 3).pow(2);  // 4×10⁶
+     * new ArbitraryNumber(2, 0).pow(-1); // 5×10⁻¹  (= 0.5)
      *
      * @param n - The exponent to raise this number to.
      * @throws `"Zero cannot be raised to a negative power"` when this is zero and `n < 0`.
@@ -220,8 +220,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @returns `1` if `this > other`, `-1` if `this < other`, `0` if equal.
      *
      * @example
-     * an(1, 4).compareTo(an(9, 3)); // 1  (10000 > 9000)
-     * an(-1, 4).compareTo(an(1, 3)); // -1 (−10000 < 1000)
+     * new ArbitraryNumber(1, 4).compareTo(new ArbitraryNumber(9, 3)); // 1  (10000 > 9000)
+     * new ArbitraryNumber(-1, 4).compareTo(new ArbitraryNumber(1, 3)); // -1 (−10000 < 1000)
      */
     public compareTo(other: ArbitraryNumber): number {
         const thisNegative = this.coefficient < 0;
@@ -281,8 +281,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * and are returned unchanged.
      *
      * @example
-     * an(1.7, 0).floor();  // 1
-     * an(-1.7, 0).floor(); // −2
+     * new ArbitraryNumber(1.7, 0).floor();  // 1
+     * new ArbitraryNumber(-1.7, 0).floor(); // −2
      */
     public floor(): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -307,8 +307,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * and are returned unchanged.
      *
      * @example
-     * an(1.2, 0).ceil();  // 2
-     * an(-1.7, 0).ceil(); // −1
+     * new ArbitraryNumber(1.2, 0).ceil();  // 2
+     * new ArbitraryNumber(-1.7, 0).ceil(); // −1
      */
     public ceil(): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -330,7 +330,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Clamps `value` to the inclusive range `[min, max]`.
      *
      * @example
-     * ArbitraryNumber.clamp(an(5, 2), an(1, 3), an(2, 3)); // 1×10³  (500 clamped to [1000, 2000])
+     * ArbitraryNumber.clamp(new ArbitraryNumber(5, 2), new ArbitraryNumber(1, 3), new ArbitraryNumber(2, 3)); // 1×10³  (500 clamped to [1000, 2000])
      *
      * @param value - The value to clamp.
      * @param min - Lower bound (inclusive).
@@ -350,8 +350,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * `log10(c) + e` — no precision loss from the exponent.
      *
      * @example
-     * an(1, 6).log10();    // 6
-     * an(1.5, 3).log10();  // log10(1.5) + 3  ≈ 3.176
+     * new ArbitraryNumber(1, 6).log10();    // 6
+     * new ArbitraryNumber(1.5, 3).log10();  // log10(1.5) + 3  ≈ 3.176
      *
      * @throws `"Logarithm of zero is undefined"` when this is zero.
      * @throws `"Logarithm of a negative number is undefined"` when this is negative.
@@ -375,9 +375,9 @@ export class ArbitraryNumber implements NormalizedNumber {
      * `decimals` controls the number of decimal places passed to the plugin and defaults to `2`.
      *
      * @example
-     * an(1.5, 3).toString();                  // "1.50e+3"
-     * an(1.5, 3).toString(unitNotation);       // "1.50 K"
-     * an(1.5, 3).toString(unitNotation, 4);    // "1.5000 K"
+     * new ArbitraryNumber(1.5, 3).toString();                  // "1.50e+3"
+     * new ArbitraryNumber(1.5, 3).toString(unitNotation);       // "1.50 K"
+     * new ArbitraryNumber(1.5, 3).toString(unitNotation, 4);    // "1.5000 K"
      *
      * @param notation - The formatting plugin to use.
      * @param decimals - Number of decimal places to render. Defaults to `2`.

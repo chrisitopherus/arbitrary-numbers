@@ -14,5 +14,5 @@ export { CLASSIC_UNITS, COMPACT_UNITS } from "./constants/units";
 export { ArbitraryNumberGuard } from "./utility/ArbitraryNumberGuard";
 
 // Types
-export type { NotationPlugin, SuffixNotationPlugin, SuffixNotationPluginOptions, Unit, UnitNotationOptions } from "./types/plugin";
+export type { NotationPlugin, SuffixProvider, SuffixNotationPlugin, SuffixNotationPluginOptions, Unit, UnitArray, UnitNotationOptions } from "./types/plugin";
 export type { NormalizedNumber } from "./types/core";

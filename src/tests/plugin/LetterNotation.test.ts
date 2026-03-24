@@ -78,8 +78,12 @@ describe("LetterNotation", () => {
             expect(fmt(1.5, 9)).toBe("1.50c");
         });
 
-        it("exponent 75 → 'z' (tier 25)", () => {
-            expect(fmt(1.5, 75)).toBe("1.50z");
+        it("exponent 75 → 'y' (tier 25)", () => {
+            expect(fmt(1.5, 75)).toBe("1.50y");
+        });
+
+        it("exponent 78 → 'z' (tier 26, last single-letter)", () => {
+            expect(fmt(1.5, 78)).toBe("1.50z");
         });
 
         it("decimals param is respected", () => {
@@ -92,16 +96,22 @@ describe("LetterNotation", () => {
     // format — two-letter suffixes (tiers 27–702)
     // -----------------------------------------------------------------------
     describe("format — two-letter suffixes", () => {
-        it("exponent 78 → 'aa' (tier 26, first two-letter)", () => {
-            expect(fmt(1.5, 78)).toBe("1.50aa");
+        it("exponent 81 → 'aa' (tier 27, first two-letter)", () => {
+            expect(fmt(1.5, 81)).toBe("1.50aa");
         });
 
-        it("exponent 81 → 'ab' (tier 27)", () => {
-            expect(fmt(1.5, 81)).toBe("1.50ab");
+        it("exponent 84 → 'ab' (tier 28)", () => {
+            expect(fmt(1.5, 84)).toBe("1.50ab");
         });
 
-        it("exponent 153 → 'ba' (tier 51)", () => {
-            expect(fmt(1.5, 153)).toBe("1.50ba");
+        it("exponent 153 → 'ay' (tier 51)", () => {
+            // tier 51 → index 50 → two-letter: offset=26, remaining=24 → 'a'+'y'
+            expect(fmt(1.5, 153)).toBe("1.50ay");
+        });
+
+        it("exponent 159 → 'ba' (tier 53)", () => {
+            // tier 53 → index 52 → remaining=26 → chars: 'b'+'a'
+            expect(fmt(1.5, 159)).toBe("1.50ba");
         });
     });
 
@@ -109,6 +119,11 @@ describe("LetterNotation", () => {
     // getSuffix
     // -----------------------------------------------------------------------
     describe("getSuffix", () => {
+        it("tier 0 → '' (no suffix for values below 10³)", () => {
+            const n = new LetterNotation();
+            expect(n.getSuffix(0)).toBe("");
+        });
+
         it("tier 1 → 'a'", () => {
             const n = new LetterNotation();
             expect(n.getSuffix(1)).toBe("a");

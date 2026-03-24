@@ -13,6 +13,9 @@ vitest.config*
 node_modules/
 .git/
 .gitignore
+.claude/
+coverage/
+media/
 
 # Misc
 *.log

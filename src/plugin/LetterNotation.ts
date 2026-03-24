@@ -19,19 +19,21 @@ export class LetterNotation extends SuffixNotationBase {
     /**
      * @param options - Plugin options. `separator` defaults to `""` (no space before the letter).
      */
-    public constructor(options: SuffixNotationPluginOptions = { separator: "" }) {
+    public constructor(options: SuffixNotationPluginOptions = {}) {
         super(options);
     }
 
     /**
      * Returns the alphabetical suffix for the given tier.
      *
+     * Tier 0 (values below 10³) returns `""` — no suffix.
      * Tier 1 → `"a"`, tier 26 → `"z"`, tier 27 → `"aa"`, etc.
      *
-     * @param tier - The exponent tier (`floor(exponent / 3)`), always ≥ 1.
-     * @returns The alphabetical suffix string.
+     * @param tier - The exponent tier (`floor(exponent / 3)`), ≥ 0.
+     * @returns The alphabetical suffix string, or `""` for tier 0.
      */
     public override getSuffix(tier: number): string {
+        if (tier === 0) return "";
         const index = tier - 1; // tier 1 = "a" = index 0
         const { letters, offset } = this.getLengthAndOffset(index);
         let remaining = index - offset;

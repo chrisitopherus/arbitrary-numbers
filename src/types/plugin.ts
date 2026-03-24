@@ -25,20 +25,32 @@ export interface NotationPlugin {
 }
 
 /**
- * A {@link NotationPlugin} that appends a human-readable suffix after the number
- * (e.g. `"1.50 K"`, `"3.20a"`).
+ * Minimal interface for anything that can map a tier to a suffix string.
  *
- * Extend {@link SuffixNotationBase} rather than implementing this interface directly.
+ * Used as the `fallback` type on {@link UnitNotation} — only `getSuffix` is
+ * ever called, so a simple object literal is enough:
+ *
+ * @example
+ * const myFallback: SuffixProvider = {
+ *   getSuffix(tier) { return tier > 10 ? "big" : ""; },
+ * };
  */
-export interface SuffixNotationPlugin extends NotationPlugin {
+export interface SuffixProvider {
     /**
      * Returns the suffix label for the given tier, where `tier = floor(exponent / 3)`.
      *
      * @param tier - The exponent tier (`floor(exponent / 3)`).
-     * @returns The suffix string (e.g. `"K"`, `"a"`).
+     * @returns The suffix string (e.g. `"K"`, `"a"`), or `""` for no suffix.
      */
     getSuffix(tier: number): string;
 }
+
+/**
+ * A full suffix-based {@link NotationPlugin} — combines formatting and suffix lookup.
+ *
+ * Extend {@link SuffixNotationBase} rather than implementing this interface directly.
+ */
+export interface SuffixNotationPlugin extends NotationPlugin, SuffixProvider {}
 
 /**
  * Options shared by all suffix-based notation plugins.
@@ -47,37 +59,75 @@ export interface SuffixNotationPluginOptions {
     /**
      * String placed between the formatted number and its suffix.
      *
-     * @default ""
+     * Defaults to `""` for most plugins. {@link UnitNotation} overrides this to `" "`,
+     * so `new UnitNotation({ units })` produces `"1.50 K"` without an explicit separator.
+     *
      * @example " " → "1.50 K"  |  "" → "1.50K"
      */
     separator?: string;
 }
 
 /**
- * A named numeric unit used by {@link UnitNotation} to map exponents to symbols.
+ * A display label for one tier of magnitude, used by {@link UnitNotation}.
+ *
+ * Units are stored in a **tier-indexed array** — the array index is the tier number,
+ * where `tier = Math.floor(exponent / 3)`. Tier 1 = thousands, tier 2 = millions, etc.
+ * The exponent is therefore implicit: `exponent = tier * 3`.
  *
  * @example
- * const million: Unit = { exponent: 6, symbol: "M", name: "Million" };
+ * // In a tier-indexed array, index 2 represents 10⁶ (millions):
+ * const units: UnitArray = [undefined, { symbol: "K" }, { symbol: "M" }];
  */
 export interface Unit {
     /** Short symbol displayed after the number, e.g. `"M"`. */
     symbol: string;
-    /** The power of 10 this unit represents, e.g. `6` for one million. */
-    exponent: number;
     /** Optional full name, e.g. `"Million"`. Used for display purposes only. */
     name?: string;
 }
 
 /**
+ * A tier-indexed array of units for use with {@link UnitNotation}.
+ *
+ * The array index equals the tier number (`Math.floor(exponent / 3)`).
+ * `undefined` at an index signals "no unit for this tier" — the fallback plugin
+ * (or plain fixed-point rendering) will be used instead.
+ *
+ * Sparse arrays are valid: unset indices are implicitly `undefined`.
+ *
+ * @example
+ * const myUnits: UnitArray = [
+ *   undefined,          // tier 0: < 1000, no suffix
+ *   { symbol: "K" },   // tier 1: thousands
+ *   { symbol: "M" },   // tier 2: millions
+ * ];
+ */
+export type UnitArray = ReadonlyArray<Unit | undefined>;
+
+/**
  * Options for constructing a {@link UnitNotation} instance.
  */
 export interface UnitNotationOptions extends SuffixNotationPluginOptions {
-    /** Ordered list of units to match against the number's exponent. */
-    units: ReadonlyArray<Unit>;
     /**
-     * Plugin used when no unit matches the exponent.
+     * Tier-indexed array of units. The array index equals the tier number
+     * (`Math.floor(exponent / 3)`). Use `undefined` at an index to signal
+     * "no unit for this tier" — the fallback plugin will be used instead.
      *
-     * @default scientificNotation
+     * @example
+     * // index 0 = tier 0 (< 1000, no suffix)
+     * // index 1 = tier 1 (thousands) → "K"
+     * // index 2 = tier 2 (millions)  → "M"
      */
-    fallback?: NotationPlugin;
+    units: UnitArray;
+    /**
+     * Suffix provider used when no unit is defined for a tier.
+     *
+     * Only {@link SuffixProvider.getSuffix} is called — the number and separator are
+     * still formatted by this `UnitNotation` instance, keeping presentation consistent.
+     * A simple object literal with just `getSuffix` is sufficient; a full plugin is not required.
+     *
+     * When omitted, tiers with no unit are rendered as a plain fixed-point number (no suffix).
+     *
+     * @default undefined
+     */
+    fallback?: SuffixProvider;
 }

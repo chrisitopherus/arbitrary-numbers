@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/logo.svg" alt="arbitrary-numbers" width="520" />
+  <img src="https://raw.githubusercontent.com/YOUR_USERNAME/arbitrary-numbers/main/media/logo.svg" alt="arbitrary-numbers" width="520" />
 
   <br/>
   <br/>
@@ -14,7 +14,7 @@
 
 Numbers that don't stop at `Number.MAX_SAFE_INTEGER`.
 
-`arbitrary-numbers` represents values as **coefficient × 10^exponent** — the exponent is a plain `number` so you can go up to 10^(1.8×10³⁰⁸). Built for idle games, simulations, and anything that compounds values over time.
+`arbitrary-numbers` stores values as **coefficient × 10^exponent** where the exponent is a plain JavaScript `number`, giving a range up to 10^(1.8×10³⁰⁸). Immutable, zero-dependency, and built for idle games, simulations, and anything that compounds values over time.
 
 ---
 
@@ -157,20 +157,21 @@ new ArbitraryNumber(1.5, 3).toString(unitNotation)   // "1.50 K"
 new ArbitraryNumber(3.2, 6).toString(unitNotation)   // "3.20 M"
 new ArbitraryNumber(1.0, 9).toString(unitNotation)   // "1.00 B"
 
-// Custom unit list with a different fallback:
-const compact = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation, separator: " " });
+// Custom unit list with letterNotation as fallback:
+const compact = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
 ```
 
-Numbers beyond the unit list fall back to `letterNotation` (for `unitNotation`) or `scientificNotation` (default fallback when none is configured).
+Numbers beyond the unit list fall back to `letterNotation` for the pre-built `unitNotation`. When building your own instance, the fallback is optional — unmatched tiers render as a plain number when none is set.
 
 ### `letterNotation` — a, b, c… aa, ab…
 
 ```typescript
 import { letterNotation } from 'arbitrary-numbers';
 
-new ArbitraryNumber(1.5, 3).toString(letterNotation)   // "1.50a"
-new ArbitraryNumber(1.5, 6).toString(letterNotation)   // "1.50b"
-new ArbitraryNumber(1.5, 78).toString(letterNotation)  // "1.50aa"
+new ArbitraryNumber(1.5, 3).toString(letterNotation)   // "1.50a"   (tier 1)
+new ArbitraryNumber(1.5, 6).toString(letterNotation)   // "1.50b"   (tier 2)
+new ArbitraryNumber(1.5, 78).toString(letterNotation)  // "1.50z"   (tier 26, last single-letter)
+new ArbitraryNumber(1.5, 81).toString(letterNotation)  // "1.50aa"  (tier 27, first two-letter)
 ```
 
 Sequences never run out — single letters `a–z`, then `aa–zz`, then `aaa`, etc.

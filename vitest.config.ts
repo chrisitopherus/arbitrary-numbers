@@ -11,10 +11,7 @@ export default defineConfig({
         "src/index.ts",
         "src/types/**",       // interface-only files, no runnable JS
         "src/constants/**",   // pure data, no logic to cover
-        // Unimplemented plugins — covered when getSuffix is implemented
-        "src/plugin/SuffixNotationBase.ts",
-        "src/plugin/LetterNotation.ts",
-        "src/plugin/UnitNotation.ts",
+        "src/dev.ts"
       ],
       reporter: ["text", "lcov"],
       thresholds: {
