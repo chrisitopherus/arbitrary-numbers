@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/YOUR_USERNAME/arbitrary-numbers/main/media/logo.svg" alt="arbitrary-numbers" width="520" />
+  <img src="https://raw.githubusercontent.com/chrisitopherus/arbitrary-numbers/main/media/logo.svg" alt="arbitrary-numbers" width="520" />
 
   <br/>
   <br/>
