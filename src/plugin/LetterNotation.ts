@@ -15,6 +15,7 @@ import { SuffixNotationBase } from "./SuffixNotationBase";
  */
 export class LetterNotation extends SuffixNotationBase {
     private readonly letters = "abcdefghijklmnopqrstuvwxyz";
+    private readonly _suffixCache = new Map<number, string>();
 
     /**
      * @param options - Plugin options. `separator` defaults to `""` (no space before the letter).
@@ -34,6 +35,14 @@ export class LetterNotation extends SuffixNotationBase {
      */
     public override getSuffix(tier: number): string {
         if (tier === 0) return "";
+        const cached = this._suffixCache.get(tier);
+        if (cached !== undefined) return cached;
+        const result = this._computeSuffix(tier);
+        this._suffixCache.set(tier, result);
+        return result;
+    }
+
+    private _computeSuffix(tier: number): string {
         const index = tier - 1; // tier 1 = "a" = index 0
         const { letters, offset } = this.getLengthAndOffset(index);
         let remaining = index - offset;

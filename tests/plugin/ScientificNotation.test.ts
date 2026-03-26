@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ScientificNotation, scientificNotation } from "../../plugin/ScientificNotation";
+import { ScientificNotation, scientificNotation } from "../../src/plugin/ScientificNotation";
 
 describe("ScientificNotation", () => {
     describe("format — exponent === 0", () => {

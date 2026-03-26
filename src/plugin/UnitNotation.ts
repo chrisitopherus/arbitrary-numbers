@@ -3,6 +3,9 @@ import { SuffixProvider, UnitArray, UnitNotationOptions } from "../types/plugin"
 import { letterNotation } from "./LetterNotation";
 import { SuffixNotationBase } from "./SuffixNotationBase";
 
+/** Lookup for remainder values 0, 1, 2 (exponent mod 3). */
+const DISPLAY_SCALE = [1, 10, 100] as const;
+
 /**
  * Formats numbers using a tier-indexed array of named units
  * (e.g. `"1.50 K"`, `"3.20 M"`, `"1.00 B"`).
@@ -47,7 +50,7 @@ export class UnitNotation extends SuffixNotationBase {
     public override format(coefficient: number, exponent: number, decimals: number): string {
         const tier = Math.floor(exponent / 3);
         const remainder = exponent - tier * 3;
-        const displayC = coefficient * Math.pow(10, remainder);
+        const displayC = coefficient * DISPLAY_SCALE[remainder]!;
         const suffix = this.getSuffix(tier);
 
         if (!suffix) return displayC.toFixed(decimals);

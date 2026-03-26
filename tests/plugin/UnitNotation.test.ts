@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { UnitNotation, unitNotation } from "../../plugin/UnitNotation";
-import { letterNotation } from "../../plugin/LetterNotation";
-import { CLASSIC_UNITS, COMPACT_UNITS } from "../../constants/units";
+import { UnitNotation, unitNotation } from "../../src/plugin/UnitNotation";
+import { letterNotation } from "../../src/plugin/LetterNotation";
+import { CLASSIC_UNITS, COMPACT_UNITS } from "../../src/constants/units";
 
 // ---------------------------------------------------------------------------
 // Helpers

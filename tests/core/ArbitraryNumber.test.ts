@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { ArbitraryNumber } from "../../core/ArbitraryNumber";
-import { scientificNotation } from "../../plugin/ScientificNotation";
-import { NotationPlugin } from "../../types/plugin";
+import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
+import { an } from "../../src/core/an";
+import { scientificNotation } from "../../src/plugin/ScientificNotation";
+import { NotationPlugin } from "../../src/types/plugin";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,6 +24,15 @@ describe("ArbitraryNumber", () => {
     // Representation invariant
     // -----------------------------------------------------------------------
     describe("representation invariant", () => {
+        it("an() shorthand creates normalized instances", () => {
+            expect(an(1500).equals(num(1500))).toBe(true);
+            expect(an(15, 3).equals(raw(1.5, 4))).toBe(true);
+        });
+
+        it("an.from() shorthand mirrors ArbitraryNumber.from", () => {
+            expect(an.from(1500).equals(ArbitraryNumber.from(1500))).toBe(true);
+        });
+
         it("coefficient is always in [1, 10) for any non-zero input", () => {
             for (const v of [1, 999, 1500, 0.003, 1e20, 7.77, 0.1]) {
                 const n = num(v);
@@ -336,6 +346,25 @@ describe("ArbitraryNumber", () => {
 
         it("among negatives, larger magnitude = smaller value: −10000 < −1000", () => {
             expect(num(-10000).lessThan(num(-1000))).toBe(true);
+        });
+
+        it("Zero is less than a positive fraction (negative exponent)", () => {
+            // Regression: Zero { exp:0 } vs 0.5 { exp:-1 } — exponent 0 > -1 must NOT
+            // incorrectly declare Zero as greater.
+            expect(ArbitraryNumber.Zero.lessThan(raw(5, -1))).toBe(true);
+            expect(raw(5, -1).greaterThan(ArbitraryNumber.Zero)).toBe(true);
+            expect(ArbitraryNumber.Zero.compareTo(raw(5, -1))).toBe(-1);
+            expect(raw(5, -1).compareTo(ArbitraryNumber.Zero)).toBe(1);
+        });
+
+        it("Zero is greater than a negative fraction", () => {
+            expect(ArbitraryNumber.Zero.greaterThan(raw(-5, -1))).toBe(true);
+            expect(raw(-5, -1).lessThan(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("Zero equals Zero via compareTo", () => {
+            expect(ArbitraryNumber.Zero.compareTo(ArbitraryNumber.Zero)).toBe(0);
+            expect(ArbitraryNumber.Zero.equals(ArbitraryNumber.Zero)).toBe(true);
         });
     });
 

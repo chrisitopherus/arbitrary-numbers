@@ -1,4 +1,5 @@
 import { NormalizedNumber } from "../types/core";
+import { POW10, pow10 } from "../constants/pow10";
 
 /**
  * Low-level arithmetic helpers that operate on {@link NormalizedNumber} objects.
@@ -23,7 +24,7 @@ export class ArbitraryNumberArithmetic {
         }
 
         const shift = Math.floor(Math.log10(Math.abs(number.coefficient)));
-        const scale = 10 ** shift;
+        const scale = (shift >= 0 && shift < 16) ? POW10[shift]! : Math.pow(10, shift);
 
         // For subnormal floats (e.g. Number.MIN_VALUE ≈ 5e-324), 10^shift underflows to 0.
         // The value is indistinguishable from zero at any practical precision.
@@ -77,7 +78,7 @@ export class ArbitraryNumberArithmetic {
      * shiftCoefficientDown(1.5, 3); // 0.0015
      */
     public static shiftCoefficientDown(coefficient: number, places: number): number {
-        return coefficient / (10 ** places);
+        return coefficient / ((places >= 0 && places < 16) ? POW10[places]! : Math.pow(10, places));
     }
 
     /**
@@ -91,6 +92,6 @@ export class ArbitraryNumberArithmetic {
      * shiftCoefficientUp(1.5, 3); // 1500
      */
     public static shiftCoefficientUp(coefficient: number, places: number): number {
-        return coefficient * (10 ** places);
+        return coefficient * ((places >= 0 && places < 16) ? POW10[places]! : Math.pow(10, places));
     }
 }

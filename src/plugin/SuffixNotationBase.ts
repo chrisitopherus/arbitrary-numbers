@@ -1,5 +1,8 @@
 import { SuffixNotationPlugin, SuffixNotationPluginOptions } from "../types/plugin";
 
+/** Lookup for remainder values 0, 1, 2 (exponent mod 3). */
+const DISPLAY_SCALE = [1, 10, 100] as const;
+
 /**
  * Abstract base class for suffix-based notation plugins (e.g. `"1.50 K"`, `"3.20a"`).
  *
@@ -48,7 +51,7 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
     public format(coefficient: number, exponent: number, decimals: number): string {
         const tier = Math.floor(exponent / 3);
         const remainder = exponent - tier * 3;         // 0, 1, or 2
-        const displayC = coefficient * Math.pow(10, remainder);
+        const displayC = coefficient * DISPLAY_SCALE[remainder]!;
         const suffix = this.getSuffix(tier);
 
         if (!suffix) {

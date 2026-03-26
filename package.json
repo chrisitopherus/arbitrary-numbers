@@ -38,12 +38,14 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "run:dev": "tsx src/dev.ts"
+    "run:dev": "tsx src/dev.ts",
+    "bench": "tsx benchmarks/arithmetic.bench.ts && tsx benchmarks/format.bench.ts && tsx benchmarks/gamePattern.bench.ts"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.1",
     "@vitest/ui": "^4.1.1",
+    "mitata": "^1.0.34",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

@@ -1,22 +1,39 @@
-# Source
+# Source & tests — consumers only need the compiled dist/
 src/
+tests/
+benchmarks/
 
-# Config
-tsup.config.ts
+# Build tooling
 tsconfig.json
 tsconfig*.json
-.eslintrc*
-.prettierrc*
-vitest.config*
+tsup.config.ts
+vitest.config.ts
+vitest.config*.ts
 
-# Dev
-node_modules/
+# Coverage
+coverage/
+
+# Development assets
+media/
+src/dev.ts
+todo.md
+
+# Docs that are only relevant to contributors
+CONTRIBUTING.md
+
+# VCS & editor
 .git/
 .gitignore
+.vscode/
+.idea/
 .claude/
-coverage/
-media/
+
+# Dependencies
+node_modules/
 
 # Misc
 *.log
+*.tgz
+*.tsbuildinfo
 .DS_Store
+Thumbs.db

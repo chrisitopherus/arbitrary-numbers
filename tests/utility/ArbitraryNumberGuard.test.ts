@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ArbitraryNumber } from "../../core/ArbitraryNumber";
-import { ArbitraryNumberGuard } from "../../utility/ArbitraryNumberGuard";
+import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
+import { ArbitraryNumberGuard } from "../../src/utility/ArbitraryNumberGuard";
 
 describe("ArbitraryNumberGuard", () => {
     // -----------------------------------------------------------------------

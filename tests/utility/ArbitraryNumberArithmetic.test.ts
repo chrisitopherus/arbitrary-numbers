@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArbitraryNumberArithmetic } from "../../utility/ArbitraryNumberArithmetic";
+import { ArbitraryNumberArithmetic } from "../../src/utility/ArbitraryNumberArithmetic";
 
 // ---------------------------------------------------------------------------
 // Tests

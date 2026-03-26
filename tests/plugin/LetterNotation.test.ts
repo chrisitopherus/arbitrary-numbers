@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LetterNotation, letterNotation } from "../../plugin/LetterNotation";
+import { LetterNotation, letterNotation } from "../../src/plugin/LetterNotation";
 
 // ---------------------------------------------------------------------------
 // Helpers
