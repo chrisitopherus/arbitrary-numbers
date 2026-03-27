@@ -533,13 +533,14 @@ Key patterns used:
 
 Benchmarks are in [`benchmarks/`](benchmarks/). Competitor comparison: [`benchmarks/COMPETITOR_BENCHMARKS.md`](benchmarks/COMPETITOR_BENCHMARKS.md).
 
-Quick reference (Node 22, Intel i5-13600KF):
+Quick reference (Node 22.16, Intel i5-13600KF):
 
 | Operation | Time |
 |---|---|
 | `add` / `sub` (typical) | ~20–28 ns |
 | `mul` / `div` | ~10–11 ns |
-| Fused ops (`mulAdd`, `mulSub`, …) | ~28 ns — **1.5–1.6× faster** than chained |
-| `sumArray(50 items)` | ~190 ns — **9× faster** than `.reduce` |
-| `compareTo` (same exponent) | ~0.2 ns |
-| `sqrt()` | ~11 ns — 1.18× faster than `.pow(0.5)` |
+| Fused ops (`mulAdd`, `mulSub`, …) | ~27–29 ns — **1.5–1.6× faster** than chained |
+| `sumArray(50 items)` | ~200 ns — **8.4–8.7× faster** than `.reduce` |
+| `compareTo` (same exponent) | ~0.6 ns |
+| `sqrt()` | ~10 ns |
+| `pow(0.5)` | ~7 ns |
