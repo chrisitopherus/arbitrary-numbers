@@ -42,7 +42,7 @@ Libraries compared:
 
 **1.22× slower than break_infinity for chained ops (no fused op used here), 8.5× faster than decimal.js**
 
-> Note: using ArbitraryNumber's fused ops (e.g. `mulAdd`) for this pattern reduces the gap with break_infinity significantly — see [BENCHMARKS.md](../BENCHMARKS.md) for fused op timings.
+> Note: using ArbitraryNumber's fused ops (e.g. `mulAdd`) for this pattern reduces the gap with break_infinity significantly. Run the benchmarks in [`benchmarks/`](.) to see fused op timings.
 
 ---
 
