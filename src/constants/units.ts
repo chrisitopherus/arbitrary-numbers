@@ -1,4 +1,4 @@
-import { Unit, UnitArray } from "../types/plugin";
+import { type Unit, type UnitArray } from "../types/plugin";
 
 /**
  * Full tier-indexed unit list from Thousand (tier 1, 10³) to Centillion (tier 101, 10³⁰³).

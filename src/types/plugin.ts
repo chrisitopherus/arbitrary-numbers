@@ -104,6 +104,22 @@ export interface Unit {
 export type UnitArray = ReadonlyArray<Unit | undefined>;
 
 /**
+ * Options for constructing an {@link AlphabetNotation} instance.
+ */
+export interface AlphabetNotationOptions extends SuffixNotationPluginOptions {
+    /**
+     * The ordered symbol set used to build multi-character suffixes.
+     *
+     * The algorithm is base-N positional: tier 1 = `alphabet[0]`, tier N = `alphabet[N-1]`,
+     * tier N+1 = `alphabet[0]+alphabet[0]`, and so on — identical to Excel column naming
+     * when `alphabet` is `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"`.
+     *
+     * @default `"abcdefghijklmnopqrstuvwxyz"`
+     */
+    alphabet?: string;
+}
+
+/**
  * Options for constructing a {@link UnitNotation} instance.
  */
 export interface UnitNotationOptions extends SuffixNotationPluginOptions {

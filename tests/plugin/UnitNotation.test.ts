@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { UnitNotation, unitNotation } from "../../src/plugin/UnitNotation";
-import { letterNotation } from "../../src/plugin/LetterNotation";
+import { letterNotation } from "../../src/plugin/AlphabetNotation";
 import { CLASSIC_UNITS, COMPACT_UNITS } from "../../src/constants/units";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +62,23 @@ describe("UnitNotation", () => {
 
         it("zero", () => {
             expect(make().format(0, 0, 2)).toBe("0.00");
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // format — negative exponents (fractional values)
+    // -----------------------------------------------------------------------
+    describe("format — negative exponents (no suffix)", () => {
+        it("exponent -1: 2 × 10^-1 = 0.2", () => {
+            expect(make().format(2, -1, 2)).toBe("0.20");
+        });
+
+        it("exponent -2: 5 × 10^-2 = 0.05", () => {
+            expect(make().format(5, -2, 2)).toBe("0.05");
+        });
+
+        it("exponent -3: 5 × 10^-3 = 0.005 (3 decimals)", () => {
+            expect(make().format(5, -3, 3)).toBe("0.005");
         });
     });
 

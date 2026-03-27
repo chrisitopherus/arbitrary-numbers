@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
 import { an } from "../../src/core/an";
 import { scientificNotation } from "../../src/plugin/ScientificNotation";
-import { NotationPlugin } from "../../src/types/plugin";
+import { type NotationPlugin } from "../../src/types/plugin";
 
 // ---------------------------------------------------------------------------
 // Helpers

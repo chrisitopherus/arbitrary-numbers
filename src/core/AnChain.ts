@@ -34,6 +34,7 @@ export class AnChain {
     public static from(value: ArbitraryNumber | number | string): AnChain {
         if (value instanceof ArbitraryNumber) return new AnChain(value);
         if (typeof value === "number")  return new AnChain(ArbitraryNumber.from(value));
+
         return new AnChain(ArbitraryNumber.from(parseFloat(value)));
     }
 

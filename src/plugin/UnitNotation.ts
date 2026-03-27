@@ -1,10 +1,7 @@
 import { CLASSIC_UNITS } from "../constants/units";
-import { SuffixProvider, UnitArray, UnitNotationOptions } from "../types/plugin";
-import { letterNotation } from "./LetterNotation";
+import { type SuffixProvider, type UnitArray, type UnitNotationOptions } from "../types/plugin";
+import { letterNotation } from "./AlphabetNotation";
 import { SuffixNotationBase } from "./SuffixNotationBase";
-
-/** Lookup for remainder values 0, 1, 2 (exponent mod 3). */
-const DISPLAY_SCALE = [1, 10, 100] as const;
 
 /**
  * Formats numbers using a tier-indexed array of named units
@@ -34,28 +31,6 @@ export class UnitNotation extends SuffixNotationBase {
         super({ separator: " ", ...options });
         this.units = options.units;
         this.fallback = options.fallback;
-    }
-
-    /**
-     * Formats the number by looking up the suffix for `tier` via {@link getSuffix} in O(1).
-     *
-     * When no suffix is found (own units and fallback both return `""`), the number is
-     * rendered as a plain fixed-point value — the separator is omitted.
-     *
-     * @param coefficient - The significand in `[1, 10)` or `0`.
-     * @param exponent - The power of 10.
-     * @param decimals - Number of decimal places in the output.
-     * @returns The formatted string.
-     */
-    public override format(coefficient: number, exponent: number, decimals: number): string {
-        const tier = Math.floor(exponent / 3);
-        const remainder = exponent - tier * 3;
-        const displayC = coefficient * DISPLAY_SCALE[remainder]!;
-        const suffix = this.getSuffix(tier);
-
-        if (!suffix) return displayC.toFixed(decimals);
-
-        return `${displayC.toFixed(decimals)}${this.separator}${suffix}`;
     }
 
     /**

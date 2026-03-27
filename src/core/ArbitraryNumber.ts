@@ -1,6 +1,6 @@
 import { scientificNotation } from "../plugin/ScientificNotation";
-import { NormalizedNumber } from "../types/core";
-import { NotationPlugin } from "../types/plugin";
+import { type NormalizedNumber } from "../types/core";
+import { type NotationPlugin } from "../types/plugin";
 import { pow10 } from "../constants/pow10";
 
 /**
@@ -92,6 +92,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (!isFinite(exponent)) {
             throw new Error("ArbitraryNumber: exponent must be finite");
         }
+
         const abs = Math.abs(coefficient);
         const shift = Math.floor(Math.log10(abs));
         // Table lookup for shifts 0–15; fall back to Math.pow for out-of-range.
@@ -102,6 +103,7 @@ export class ArbitraryNumber implements NormalizedNumber {
             this.exponent = 0;
             return;
         }
+
         this.coefficient = coefficient / scale;
         this.exponent = exponent + shift;
     }
@@ -132,10 +134,12 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     private static normalizeFrom(c: number, e: number): ArbitraryNumber {
         if (c === 0) return ArbitraryNumber.Zero;
+
         const abs = Math.abs(c);
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) return ArbitraryNumber.Zero;
+
         return ArbitraryNumber.createNormalized(c / scale, e + shift);
     }
 
@@ -181,6 +185,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public sub(other: ArbitraryNumber): ArbitraryNumber {
         if (other.coefficient === 0) return this;
+
         const negC = -other.coefficient;
         if (this.coefficient === 0) return ArbitraryNumber.createNormalized(negC, other.exponent);
 
@@ -209,11 +214,13 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public mul(other: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0 || other.coefficient === 0) return ArbitraryNumber.Zero;
+
         const c = this.coefficient * other.coefficient;
         const e = this.exponent + other.exponent;
         // Both inputs are in [1,10) (or (−10,−1]), so |c| ∈ [1,100) — at most one step up.
         const absC = c < 0 ? -c : c;
         if (absC >= 10) return ArbitraryNumber.createNormalized(c / 10, e + 1);
+
         return ArbitraryNumber.createNormalized(c, e);
     }
 
@@ -227,12 +234,15 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public div(other: ArbitraryNumber): ArbitraryNumber {
         if (other.coefficient === 0) throw new Error("Division by zero");
+
         const c = this.coefficient / other.coefficient;
         const e = this.exponent - other.exponent;
         if (c === 0) return ArbitraryNumber.Zero;
+
         // Both inputs are in [1,10) (or (−10,−1]), so |c| ∈ (0.1,10) — at most one step down.
         const absC = c < 0 ? -c : c;
         if (absC < 1) return ArbitraryNumber.createNormalized(c * 10, e - 1);
+
         return ArbitraryNumber.createNormalized(c, e);
     }
 
@@ -244,6 +254,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public negate(): ArbitraryNumber {
         if (this.coefficient === 0) return ArbitraryNumber.Zero;
+
         return ArbitraryNumber.createNormalized(-this.coefficient, this.exponent);
     }
 
@@ -257,6 +268,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public abs(): ArbitraryNumber {
         if (this.coefficient >= 0) return this;
+
         return ArbitraryNumber.createNormalized(-this.coefficient, this.exponent);
     }
 
@@ -282,12 +294,22 @@ export class ArbitraryNumber implements NormalizedNumber {
             if (n < 0) {
                 throw new Error("Zero cannot be raised to a negative power");
             }
+
             return ArbitraryNumber.Zero;
         }
 
+        if (this.coefficient < 0 && !Number.isInteger(n)) {
+            throw new Error("ArbitraryNumber.pow: fractional exponent of a negative base is not supported");
+        }
+
+        // Fold any fractional part of (exponent * n) into the coefficient so the
+        // stored exponent stays integral. Suffix formatters require exponent % 3 ∈ {0,1,2}.
+        const rawExp = this.exponent * n;
+        const intExp = Math.floor(rawExp);
+        const fracExp = rawExp - intExp;
         return new ArbitraryNumber(
-            Math.pow(this.coefficient, n),
-            this.exponent * n,
+            Math.pow(this.coefficient, n) * Math.pow(10, fracExp),
+            intExp,
         );
     }
 
@@ -366,10 +388,12 @@ export class ArbitraryNumber implements NormalizedNumber {
 
                 // Normalise the sum so the subsequent multiply has a [1, 10) coefficient.
                 if (cs === 0) return ArbitraryNumber.Zero;
+
                 const abs = Math.abs(cs);
                 const shift = Math.floor(Math.log10(abs));
                 const scale = pow10(shift);
                 if (scale === 0) return ArbitraryNumber.Zero;
+
                 cs /= scale;
                 es += shift;
             }
@@ -381,6 +405,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         const ep = es + multiplier.exponent;
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; return ArbitraryNumber.createNormalized(cp, ep + 1); }
+
         return ArbitraryNumber.createNormalized(cp, ep);
     }
 
@@ -395,6 +420,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (this.coefficient === 0 || multiplier.coefficient === 0) {
             // (0 × mult) − sub = −sub
             if (subtrahend.coefficient === 0) return ArbitraryNumber.Zero;
+
             return ArbitraryNumber.createNormalized(-subtrahend.coefficient, subtrahend.exponent);
         }
 
@@ -453,10 +479,12 @@ export class ArbitraryNumber implements NormalizedNumber {
                     cs = -subtrahend.coefficient + this.coefficient / pow10(-diff); es = subtrahend.exponent;
                 }
                 if (cs === 0) return ArbitraryNumber.Zero;
+
                 const abs = Math.abs(cs);
                 const shift = Math.floor(Math.log10(abs));
                 const scale = pow10(shift);
                 if (scale === 0) return ArbitraryNumber.Zero;
+
                 cs /= scale; es += shift;
             }
         }
@@ -465,6 +493,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         const ep = es + multiplier.exponent;
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; return ArbitraryNumber.createNormalized(cp, ep + 1); }
+
         return ArbitraryNumber.createNormalized(cp, ep);
     }
 
@@ -482,6 +511,7 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         // Step 1: Divide (mirrors div() without creating an ArbitraryNumber)
         if (this.coefficient === 0) return addend;
+
         let cd = this.coefficient / divisor.coefficient;
         let ed = this.exponent - divisor.exponent;
         const absC = cd < 0 ? -cd : cd;
@@ -536,17 +566,21 @@ export class ArbitraryNumber implements NormalizedNumber {
         for (let i = 0; i < len; i++) {
             const n = numbers[i]!;
             if (n.coefficient === 0) continue;
+
             const diff = pivotExp - n.exponent;   // always ≥ 0
             if (diff > ArbitraryNumber.PrecisionCutoff) continue;  // negligible vs pivot
+
             total += n.coefficient / pow10(diff);
         }
 
         // Single normalisation pass for the entire array.
         if (total === 0) return ArbitraryNumber.Zero;
+
         const abs = Math.abs(total);
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) return ArbitraryNumber.Zero;
+
         return ArbitraryNumber.createNormalized(total / scale, pivotExp + shift);
     }
 
@@ -715,6 +749,7 @@ export class ArbitraryNumber implements NormalizedNumber {
     public static lerp(a: ArbitraryNumber, b: ArbitraryNumber, t: number): ArbitraryNumber {
         if (t === 0) return a;
         if (t === 1) return b;
+
         return a.add(b.sub(a).mul(ArbitraryNumber.from(t)));
     }
 
@@ -781,6 +816,7 @@ export class ArbitraryNumber implements NormalizedNumber {
             // Odd exponent: shift one factor of 10 into the coefficient
             return ArbitraryNumber.createNormalized(Math.sqrt(this.coefficient * 10), (this.exponent - 1) / 2);
         }
+
         return ArbitraryNumber.createNormalized(Math.sqrt(this.coefficient), this.exponent / 2);
     }
 
@@ -801,10 +837,12 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (this.exponent < 0) {
             // exponent <= -2: |value| < 0.1 → always rounds to 0
             if (this.exponent <= -2) return ArbitraryNumber.Zero;
+
             // exponent === -1: value = coefficient × 0.1  (no Math.pow needed)
             const rounded = Math.round(this.coefficient * 0.1);
             return rounded === 0 ? ArbitraryNumber.Zero : new ArbitraryNumber(rounded, 0);
         }
+
         return new ArbitraryNumber(Math.round(this.coefficient * pow10(this.exponent)), 0);
     }
 
@@ -854,6 +892,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         // A normalised coefficient is in [1, 10). For any negative exponent, the value
         // is strictly in (0, 1) exclusive, which is never an integer.
         if (this.exponent < 0) return false;
+
         // exponent ∈ [0, PrecisionCutoff-1] — covered by pow10 table (0–15)
         return Number.isInteger(this.coefficient * pow10(this.exponent));
     }

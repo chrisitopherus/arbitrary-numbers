@@ -7,6 +7,7 @@ const raw = (c: number, e: number) => new ArbitraryNumber(c, e);
 function approxEqual(a: ArbitraryNumber, b: ArbitraryNumber, tol = 1e-9): boolean {
     if (a.coefficient === 0 && b.coefficient === 0) return true;
     if (a.exponent !== b.exponent) return false;
+
     const rel = Math.abs(a.coefficient - b.coefficient) / Math.max(Math.abs(a.coefficient), Math.abs(b.coefficient));
     return rel <= tol;
 }

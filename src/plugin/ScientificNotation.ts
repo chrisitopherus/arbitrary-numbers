@@ -1,4 +1,4 @@
-import { NotationPlugin } from "../types/plugin";
+import { type NotationPlugin } from "../types/plugin";
 
 /**
  * Formats numbers using standard scientific notation: `"1.50e+3"`, `"1.50e-5"`.
@@ -21,7 +21,10 @@ export class ScientificNotation implements NotationPlugin {
      * @returns The formatted string.
      */
     public format(coefficient: number, exponent: number, decimals: number): string {
-        if (exponent === 0) return coefficient.toFixed(decimals);
+        if (exponent === 0) {
+            return coefficient.toFixed(decimals);
+        }
+
         const sign = exponent < 0 ? "-" : "+";
         return `${coefficient.toFixed(decimals)}e${sign}${Math.abs(exponent)}`;
     }

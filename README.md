@@ -38,7 +38,7 @@ const b = an(2.5, 3);   //     2,500
 
 a.add(b).toString()              // "1.50e+6"
 a.add(b).toString(unitNotation)  // "1.50 M"
-a.mul(b).toString(unitNotation)  // "3.75 G"
+a.mul(b).toString(unitNotation)  // "3.75 B"
 a.greaterThan(b)                 // true
 a.log10()                        // 6.176...
 
@@ -253,10 +253,10 @@ import { letterNotation } from "arbitrary-numbers";
 const custom = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
 ```
 
-### `letterNotation` — a, b, c… aa, ab…
+### `AlphabetNotation` — a, b, c… aa, ab…
 
 ```typescript
-import { letterNotation } from "arbitrary-numbers";
+import { letterNotation, AlphabetNotation, alphabetSuffix } from "arbitrary-numbers";
 
 an(1.5, 3).toString(letterNotation)   // "1.50a"   (tier 1)
 an(1.5, 6).toString(letterNotation)   // "1.50b"   (tier 2)
@@ -265,6 +265,26 @@ an(1.5, 81).toString(letterNotation)  // "1.50aa"  (tier 27)
 ```
 
 Suffixes never run out — `a–z`, then `aa–zz`, then `aaa`, and so on.
+
+Pass a custom `alphabet` to produce any suffix sequence. Excel-style column labels, for example:
+
+```typescript
+const excelNotation = new AlphabetNotation({ alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ" });
+
+an(1.5, 3).toString(excelNotation)    // "1.50A"
+an(1.5, 78).toString(excelNotation)  // "1.50Z"
+an(1.5, 81).toString(excelNotation)  // "1.50AA"
+```
+
+`alphabetSuffix(tier, alphabet?)` exposes the algorithm as a standalone function for cases where you only need the label — no formatter, no class:
+
+```typescript
+import { alphabetSuffix } from "arbitrary-numbers";
+
+alphabetSuffix(1)                               // "a"
+alphabetSuffix(27)                              // "aa"
+alphabetSuffix(27, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") // "AA"
+```
 
 ---
 

@@ -1,5 +1,5 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-import { NormalizedNumber } from "../types/core";
+import { type NormalizedNumber } from "../types/core";
 
 /**
  * Type-guard helpers for {@link ArbitraryNumber} and {@link NormalizedNumber}.

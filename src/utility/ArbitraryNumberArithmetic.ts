@@ -1,5 +1,5 @@
-import { NormalizedNumber } from "../types/core";
-import { POW10, pow10 } from "../constants/pow10";
+import { type NormalizedNumber } from "../types/core";
+import { POW10 } from "../constants/pow10";
 
 /**
  * Low-level arithmetic helpers that operate on {@link NormalizedNumber} objects.
