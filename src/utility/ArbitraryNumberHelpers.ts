@@ -19,6 +19,9 @@ export class ArbitraryNumberHelpers {
     /**
      * Returns `true` when `value >= threshold`.
      *
+     * @param value - The value to test.
+     * @param threshold - The minimum required value.
+     * @returns `true` when `value >= threshold`.
      * @example
      * ArbitraryNumberHelpers.meetsOrExceeds(gold, upgradeCost)
      */
@@ -30,6 +33,12 @@ export class ArbitraryNumberHelpers {
     /**
      * Returns the largest whole multiple count of `step` that fits into `total`.
      *
+     * Equivalent to `floor(total / step)`.
+     *
+     * @param total - The total available amount.
+     * @param step - The cost or size of one unit. Must be greater than zero.
+     * @returns The number of whole units that fit, as an `ArbitraryNumber`.
+     * @throws `"step must be greater than zero"` when `step <= 0`.
      * @example
      * const canBuy = ArbitraryNumberHelpers.wholeMultipleCount(gold, upgradeCost);
      */
@@ -49,8 +58,12 @@ export class ArbitraryNumberHelpers {
     }
 
     /**
-     * Returns `value - delta` but never lower than `floor` (default `0`).
+     * Returns `value - delta`, clamped to a minimum of `floor` (default `0`).
      *
+     * @param value - The starting value.
+     * @param delta - The amount to subtract.
+     * @param floor - The minimum result. Defaults to `ArbitraryNumber.Zero`.
+     * @returns `max(value - delta, floor)`.
      * @example
      * health = ArbitraryNumberHelpers.subtractWithFloor(health, damage);
      */

@@ -31,7 +31,7 @@ Requires TypeScript `"strict": true`.
 ## Quick start
 
 ```typescript
-import { ArbitraryNumber, an, chain, unitNotation } from "arbitrary-numbers";
+import { ArbitraryNumber, an, chain, formula, unitNotation } from "arbitrary-numbers";
 
 const a = an(1.5, 6);   // 1,500,000  — shorthand for new ArbitraryNumber(1.5, 6)
 const b = an(2.5, 3);   //     2,500
@@ -46,12 +46,17 @@ a.log10()                        // 6.176...
 a.mulAdd(an(2), b)               // (a × 2) + b  in one pass
 a.divAdd(b, an(1, 3))            // (a ÷ b) + 1000  in one pass
 
-// chain() builds readable multi-step formulas
+// chain() builds readable multi-step formulas (one-shot, immediate)
 const damage = chain(a)
     .subMul(b, an(3))            // (a − b) × 3
     .add(an(5, 4))               //        + 50000
     .floor()
     .done();
+
+// formula() defines a reusable pipeline — define once, apply to any value
+const double = formula("Double").mul(an(2));
+double.apply(a)                  // 3,000,000
+double.apply(b)                  // 5,000
 ```
 
 ---
@@ -62,6 +67,7 @@ const damage = chain(a)
 - [Arithmetic](#arithmetic)
 - [Fused operations](#fused-operations)
 - [Fluent builder — `chain()`](#fluent-builder--chain)
+- [Reusable formulas — `formula()`](#reusable-formulas--formula)
 - [Comparison & predicates](#comparison--predicates)
 - [Rounding & math](#rounding--math)
 - [Display & formatting](#display--formatting)
@@ -172,6 +178,63 @@ const damage = chain(base)
 All fused ops are available on the builder. Complex multi-step formulas do not need to sacrifice performance.
 
 Available methods: `add`, `sub`, `mul`, `div`, `pow`, `mulAdd`, `addMul`, `mulSub`, `subMul`, `divAdd`, `abs`, `neg`, `sqrt`, `floor`, `ceil`, `round`, `done`.
+
+---
+
+## Reusable formulas — `formula()`
+
+`formula()` builds a deferred pipeline. Unlike `chain()`, which executes each step immediately, a formula stores its operations as closures and runs them only when `apply()` is called — so the same formula can be applied to any number of values.
+
+```typescript
+import { formula, an } from "arbitrary-numbers";
+
+// Define once
+const armorReduction = formula("Armor Reduction")
+    .subMul(armor, an(7.5, -1))   // (base − armor) × 0.75
+    .floor();
+
+// Apply to many values
+const physDamage = armorReduction.apply(physBase);
+const magDamage  = armorReduction.apply(magBase);
+```
+
+Each builder method returns a **new** `AnFormula` — the original is unchanged. This makes branching and composition safe:
+
+```typescript
+const base      = formula().mul(an(2));
+const withFloor = base.floor();   // new formula — base still ends at mul(2)
+const withCeil  = base.ceil();    // another branch from base
+```
+
+Compose two formulas in order with `then()`:
+
+```typescript
+const critMult  = an(15, -1);   // 1.5×
+const critBonus = formula("Crit Bonus").mul(critMult).ceil();
+
+const full   = armorReduction.then(critBonus);
+const result = full.apply(baseDamage);
+```
+
+Name a formula with `named()` — useful for logging and debugging:
+
+```typescript
+const f = formula().mul(an(2)).named("Double");
+f.name   // "Double"
+```
+
+Available methods: `add`, `sub`, `mul`, `div`, `pow`, `mulAdd`, `addMul`, `mulSub`, `subMul`, `divAdd`, `abs`, `neg`, `sqrt`, `floor`, `ceil`, `round`, `then`, `named`, `apply`.
+
+### `chain()` vs `formula()`
+
+| | `chain(value)` | `formula(name?)` |
+|---|---|---|
+| Execution | Immediate — each step runs now | Deferred — runs on `apply()` |
+| Input | Takes a value at construction | Takes a value at `apply()` |
+| Reusable | No — one-shot builder | Yes — apply to any value, any number of times |
+| Composable | No | Yes — `a.then(b)` |
+| Builder style | Stateful — steps update an internal accumulator | Immutable — each step returns a new `AnFormula` |
+| Terminal | `.done()` | `.apply(value)` |
 
 ---
 

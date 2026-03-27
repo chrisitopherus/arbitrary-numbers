@@ -33,8 +33,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Default: 15 (matches float64 coefficient precision of ~15.95 significant digits).
      * Game patterns: diffs 0–8 (exact), prestige 15–25 (loss <0.0001%), idle 20–50 (~0.1% loss).
      *
-     * Override: ArbitraryNumber.PrecisionCutoff = 50 (financial), Infinity (scientific).
-     * Performance: 0% overhead — JIT-inlines static property reads.
+     * Override globally via assignment, or use {@link withPrecision} for a scoped block.
      */
     public static PrecisionCutoff: number = 15;
 

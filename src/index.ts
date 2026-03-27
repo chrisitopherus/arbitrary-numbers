@@ -2,6 +2,7 @@
 export { ArbitraryNumber } from "./core/ArbitraryNumber";
 export { an } from "./core/an";
 export { AnChain, chain } from "./core/AnChain";
+export { AnFormula, formula } from "./core/AnFormula";
 export type { AnFunction } from "./core/an";
 
 // Plugins
@@ -18,9 +19,10 @@ export { ArbitraryNumberGuard } from "./utility/ArbitraryNumberGuard";
 export { ArbitraryNumberOps } from "./utility/ArbitraryNumberOps";
 export { ArbitraryNumberHelpers } from "./utility/ArbitraryNumberHelpers";
 
-// Short aliases (backwards-compatible)
+// Short aliases
 export { ArbitraryNumberOps as ops } from "./utility/ArbitraryNumberOps";
 export { ArbitraryNumberGuard as guard } from "./utility/ArbitraryNumberGuard";
+export { ArbitraryNumberHelpers as helpers } from "./utility/ArbitraryNumberHelpers";
 
 // Types
 export type { ArbitraryNumberish } from "./utility/ArbitraryNumberOps";

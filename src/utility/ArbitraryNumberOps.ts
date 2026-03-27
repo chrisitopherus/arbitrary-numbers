@@ -32,6 +32,8 @@ export class ArbitraryNumberOps {
     /**
      * Returns `left + right`, coercing both operands as needed.
      *
+     * @param left - The augend.
+     * @param right - The addend.
      * @example
      * ops.add(1500, 2500) // ArbitraryNumber (4000)
      */
@@ -42,6 +44,8 @@ export class ArbitraryNumberOps {
     /**
      * Returns `left - right`, coercing both operands as needed.
      *
+     * @param left - The minuend.
+     * @param right - The subtrahend.
      * @example
      * ops.sub(5000, 1500) // ArbitraryNumber (3500)
      */
@@ -52,6 +56,8 @@ export class ArbitraryNumberOps {
     /**
      * Returns `left × right`, coercing both operands as needed.
      *
+     * @param left - The multiplicand.
+     * @param right - The multiplier.
      * @example
      * ops.mul(an(1, 3), 5) // ArbitraryNumber (5000)
      */
@@ -62,8 +68,9 @@ export class ArbitraryNumberOps {
     /**
      * Returns `left ÷ right`, coercing both operands as needed.
      *
+     * @param left - The dividend.
+     * @param right - The divisor.
      * @throws `"Division by zero"` when `right` is zero.
-     *
      * @example
      * ops.div(an(1, 6), 1000) // ArbitraryNumber (1000)
      */
@@ -74,8 +81,9 @@ export class ArbitraryNumberOps {
     /**
      * Compares `left` to `right`.
      *
+     * @param left - The left operand.
+     * @param right - The right operand.
      * @returns `1` if `left > right`, `-1` if `left < right`, `0` if equal.
-     *
      * @example
      * ops.compare(5000, 1500) // 1
      */
@@ -86,6 +94,9 @@ export class ArbitraryNumberOps {
     /**
      * Clamps `value` to the inclusive range `[min, max]`, coercing all inputs as needed.
      *
+     * @param value - The value to clamp.
+     * @param min - The lower bound (inclusive).
+     * @param max - The upper bound (inclusive).
      * @example
      * ops.clamp(500, 1000, 2000) // ArbitraryNumber (1000)  — below min, returns min
      */
