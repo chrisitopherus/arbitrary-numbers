@@ -31,11 +31,10 @@ export class AnChain {
 
     // ── Construction ────────────────────────────────────────────────────
 
-    public static from(value: ArbitraryNumber | number | string): AnChain {
+    public static from(value: ArbitraryNumber | number): AnChain {
         if (value instanceof ArbitraryNumber) return new AnChain(value);
-        if (typeof value === "number")  return new AnChain(ArbitraryNumber.from(value));
 
-        return new AnChain(ArbitraryNumber.from(parseFloat(value)));
+        return new AnChain(ArbitraryNumber.from(value));
     }
 
     // ── Arithmetic ───────────────────────────────────────────────────────
@@ -87,6 +86,6 @@ export class AnChain {
  *     .floor()
  *     .done();
  */
-export function chain(value: ArbitraryNumber | number | string): AnChain {
+export function chain(value: ArbitraryNumber | number): AnChain {
     return AnChain.from(value);
 }
