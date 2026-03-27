@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <defs>
+
+    <!--
+      Zod's exact palette: #3a6aff (bottom/dark) → #45a9ff (top/light).
+      Vertical gradient gives the same bottom-dark / top-light depth Zod uses.
+    -->
+    <linearGradient id="base" x1="200" y1="165" x2="200" y2="35" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#3a6aff"/>
+      <stop offset="100%" stop-color="#45a9ff"/>
+    </linearGradient>
+
+    <!-- Specular: white sheen across the upper half only -->
+    <linearGradient id="sheen" x1="200" y1="35" x2="200" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="white" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Soft outer glow — same colour as the gradient base -->
+    <filter id="glow" x="-18%" y="-36%" width="136%" height="172%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+  </defs>
+
+  <!--
+    ∞  —  single closed cubic-bezier path.
+    The curve crosses itself at (200, 100): the stroke naturally overlaps
+    there, producing the genuine figure-8 crossing of the ∞ symbol.
+
+    Path extents (centre-line): x 35–365, y 35–165.
+    Stroke outer edge:          x 12–388, y 12–188  (stroke-width 46, r=23).
+    Inner hole per loop:        ≈ 119 × 84 px — clearly visible.
+  -->
+
+  <!-- 1 — blue gradient body with glow -->
+  <path d="M 200,100
+           C 228,35 365,35 365,100
+           C 365,165 228,165 200,100
+           C 172,35 35,35 35,100
+           C 35,165 172,165 200,100"
+        fill="none"
+        stroke="url(#base)"
+        stroke-width="46"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
+
+  <!-- 2 — specular highlight layer (top ~half, fades out) -->
+  <path d="M 200,100
+           C 228,35 365,35 365,100
+           C 365,165 228,165 200,100
+           C 172,35 35,35 35,100
+           C 35,165 172,165 200,100"
+        fill="none"
+        stroke="url(#sheen)"
+        stroke-width="46"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+</svg>
