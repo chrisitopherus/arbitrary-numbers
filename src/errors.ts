@@ -24,9 +24,9 @@ export class ArbitraryNumberError extends Error {
  */
 export class ArbitraryNumberInputError extends ArbitraryNumberError {
     /** The invalid value that caused the error. */
-    public readonly value: number;
+    public readonly value: number | string;
 
-    public constructor(message: string, value: number) {
+    public constructor(message: string, value: number | string) {
         super(message);
         this.name = "ArbitraryNumberInputError";
         this.value = value;

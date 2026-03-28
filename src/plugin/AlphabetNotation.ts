@@ -1,3 +1,4 @@
+import { ArbitraryNumberInputError } from "../errors";
 import { type AlphabetNotationOptions } from "../types/plugin";
 import { SuffixNotationBase } from "./SuffixNotationBase";
 
@@ -34,7 +35,7 @@ import { SuffixNotationBase } from "./SuffixNotationBase";
  * alphabetSuffix(27, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") // "AA"
  */
 export function alphabetSuffix(tier: number, alphabet = "abcdefghijklmnopqrstuvwxyz"): string {
-    if (alphabet.length === 0) throw new Error("alphabet must not be empty");
+    if (alphabet.length === 0) throw new ArbitraryNumberInputError("alphabet must not be empty", alphabet);
     if (tier <= 0) return "";
 
     const index = tier - 1; // tier 1 = first symbol = index 0
