@@ -144,7 +144,7 @@ export class AnFormula {
         let result: ArbitraryNumber = value instanceof ArbitraryNumber
             ? value
             : ArbitraryNumber.from(value);
-            
+
         for (const step of this.steps) {
             result = step(result);
         }

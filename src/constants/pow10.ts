@@ -13,11 +13,11 @@ export const POW10 = [
 /**
  * Returns `10^n`.
  *
- * Uses the {@link POW10} lookup table for `n in [0, 15]` and falls back to
+ * Uses the {@link POW10} lookup table for integer `n ∈ [0, 15]` and falls back to
  * `Math.pow(10, n)` for values outside that range (e.g. when `PrecisionCutoff > 15`).
  *
- * @param n - The exponent. Must be a non-negative integer for table lookup.
+ * @param n - The exponent. Must be a non-negative integer; fractional values are not supported.
  */
 export function pow10(n: number): number {
-    return (Number.isInteger(n) && n >= 0 && n < 16) ? POW10[n]! : Math.pow(10, n);
+    return (n >= 0 && n < 16) ? POW10[n]! : Math.pow(10, n);
 }
