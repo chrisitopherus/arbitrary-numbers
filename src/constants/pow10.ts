@@ -19,5 +19,5 @@ export const POW10 = [
  * @param n - The exponent. Must be a non-negative integer for table lookup.
  */
 export function pow10(n: number): number {
-    return (n >= 0 && n < 16) ? POW10[n]! : Math.pow(10, n);
+    return (Number.isInteger(n) && n >= 0 && n < 16) ? POW10[n]! : Math.pow(10, n);
 }

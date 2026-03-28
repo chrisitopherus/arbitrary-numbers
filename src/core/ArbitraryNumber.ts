@@ -233,7 +233,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @throws `"Division by zero"` when `other` is zero.
      */
     public div(other: ArbitraryNumber): ArbitraryNumber {
-        if (other.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber() });
+        if (other.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
 
         const c = this.coefficient / other.coefficient;
         const e = this.exponent - other.exponent;
@@ -507,7 +507,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @throws `"Division by zero"` when divisor is zero.
      */
     public divAdd(divisor: ArbitraryNumber, addend: ArbitraryNumber): ArbitraryNumber {
-        if (divisor.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber() });
+        if (divisor.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
 
         // Step 1: Divide (mirrors div() without creating an ArbitraryNumber)
         if (this.coefficient === 0) return addend;

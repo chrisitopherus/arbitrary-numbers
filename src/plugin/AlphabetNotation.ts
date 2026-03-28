@@ -34,6 +34,7 @@ import { SuffixNotationBase } from "./SuffixNotationBase";
  * alphabetSuffix(27, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") // "AA"
  */
 export function alphabetSuffix(tier: number, alphabet = "abcdefghijklmnopqrstuvwxyz"): string {
+    if (alphabet.length === 0) alphabet = "abcdefghijklmnopqrstuvwxyz";
     if (tier <= 0) return "";
 
     const index = tier - 1; // tier 1 = first symbol = index 0
