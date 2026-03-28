@@ -1,3 +1,4 @@
+import { type Mod3 } from "../types/core";
 import { type SuffixNotationPlugin, type SuffixNotationPluginOptions } from "../types/plugin";
 
 /**
@@ -29,10 +30,10 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
     /**
      * Returns the suffix label for the given tier, where `tier = floor(exponent / 3)`.
      *
-     * Tier 0 corresponds to values below 10³ — return `""` to render with no suffix.
-     * Tier 1 = 10³, tier 2 = 10⁶, and so on.
+     * Tier 0 corresponds to values below 10^3 - return `""` to render with no suffix.
+     * Tier 1 = 10^3, tier 2 = 10^6, and so on.
      *
-     * @param tier - The exponent tier (`floor(exponent / 3)`), ≥ 0.
+     * @param tier - The exponent tier (`floor(exponent / 3)`), >= 0.
      * @returns The suffix string (e.g. `"K"`, `"a"`), or `""` for no suffix.
      */
     public abstract getSuffix(tier: number): string;
@@ -53,13 +54,11 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
         }
 
         const tier = Math.floor(exponent / 3);
-        const remainder = exponent - tier * 3;  // 0, 1, or 2
-        const displayC = coefficient * this.displayScale[remainder]!;
+        const remainder = (exponent - tier * 3) as Mod3;
+        const displayC = coefficient * this.displayScale[remainder];
         const suffix = this.getSuffix(tier);
 
-        if (!suffix) {
-            return displayC.toFixed(decimals);
-        }
+        if (!suffix) return displayC.toFixed(decimals);
 
         return `${displayC.toFixed(decimals)}${this.separator}${suffix}`;
     }

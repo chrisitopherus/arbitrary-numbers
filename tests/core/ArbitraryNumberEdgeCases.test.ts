@@ -540,6 +540,7 @@ describe("smoke: idle-game tick (resource accumulation)", () => {
         for (let i = 0; i < 1000; i++) {
             resources = resources.add(incomePerTick);
         }
+
         // Expected: 1000 × 1.5e6 = 1.5e9
         expect(approxEq(resources, raw(1.5, 9))).toBe(true);
     });
@@ -562,6 +563,7 @@ describe("smoke: prestige loop (exponential scaling)", () => {
         for (let i = 0; i < 20; i++) {
             prestigeMultiplier = prestigeMultiplier.mul(factor);
         }
+
         // 10^20
         const expected = raw(1, 20);
         expect(approxEq(prestigeMultiplier, expected)).toBe(true);

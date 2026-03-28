@@ -49,63 +49,6 @@ describe("ArbitraryNumberGuard", () => {
     });
 
     // -----------------------------------------------------------------------
-    // isScientificNotation
-    // -----------------------------------------------------------------------
-    describe("isScientificNotation", () => {
-        it("returns true when both coefficient and exponent are numbers", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: 1.5, exponent: 3 })).toBe(true);
-        });
-
-        it("returns true for an ArbitraryNumber (it has numeric fields)", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation(new ArbitraryNumber(1.5, 3))).toBe(true);
-        });
-
-        it("returns true for ArbitraryNumber.Zero", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation(ArbitraryNumber.Zero)).toBe(true);
-        });
-
-        it("returns true when coefficient is 0 and exponent is 0", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: 0, exponent: 0 })).toBe(true);
-        });
-
-        it("returns true when coefficient is NaN (NaN is typeof 'number')", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: NaN, exponent: 0 })).toBe(true);
-        });
-
-        it("returns false for undefined", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation(undefined)).toBe(false);
-        });
-
-        it("returns false for null (not undefined, but coefficient check fails)", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation(null)).toBe(false);
-        });
-
-        it("returns false when coefficient is missing", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ exponent: 3 })).toBe(false);
-        });
-
-        it("returns false when exponent is missing", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: 1.5 })).toBe(false);
-        });
-
-        it("returns false when coefficient is a string", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: "1.5", exponent: 3 })).toBe(false);
-        });
-
-        it("returns false when exponent is a string", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({ coefficient: 1.5, exponent: "3" })).toBe(false);
-        });
-
-        it("returns false for a plain number", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation(42)).toBe(false);
-        });
-
-        it("returns false for an empty object", () => {
-            expect(ArbitraryNumberGuard.isScientificNotation({})).toBe(false);
-        });
-    });
-
-    // -----------------------------------------------------------------------
     // isZero
     // -----------------------------------------------------------------------
     describe("isZero", () => {

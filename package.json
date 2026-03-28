@@ -4,6 +4,14 @@
   "description": "Immutable arbitrary-magnitude numbers for idle games, simulations, and scientific computing. Stored as coefficient × 10^exponent with pluggable display formatting.",
   "author": "Chris",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisitopherus/arbitrary-numbers.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chrisitopherus/arbitrary-numbers/issues"
+  },
+  "homepage": "https://github.com/chrisitopherus/arbitrary-numbers#readme",
   "keywords": [
     "arbitrary-numbers",
     "big-number",
@@ -34,7 +42,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsup",
+    "build": "tsc --noEmit && vitest run && npm run lint && tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:ui": "vitest --ui",

@@ -1,10 +1,12 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-import { ArbitraryNumberOps, type ArbitraryNumberish } from "./ArbitraryNumberOps";
+import type { ArbitraryNumberish } from "../types/utility";
+import { ArbitraryNumberOps } from "./ArbitraryNumberOps";
+import { ArbitraryNumberInputError } from "../errors";
 
 /**
  * Domain-level helpers for common game and simulation patterns.
  *
- * These sit above the core arithmetic layer — each method accepts
+ * These sit above the core arithmetic layer - each method accepts
  * mixed input (`number | ArbitraryNumber`) via
  * {@link ArbitraryNumberOps.from} so they work at system boundaries
  * where you may receive raw numbers.
@@ -19,6 +21,9 @@ export class ArbitraryNumberHelpers {
     /**
      * Returns `true` when `value >= threshold`.
      *
+     * @param value - The value to test.
+     * @param threshold - The minimum required value.
+     * @returns `true` when `value >= threshold`.
      * @example
      * ArbitraryNumberHelpers.meetsOrExceeds(gold, upgradeCost)
      */
@@ -30,6 +35,12 @@ export class ArbitraryNumberHelpers {
     /**
      * Returns the largest whole multiple count of `step` that fits into `total`.
      *
+     * Equivalent to `floor(total / step)`.
+     *
+     * @param total - The total available amount.
+     * @param step - The cost or size of one unit. Must be greater than zero.
+     * @returns The number of whole units that fit, as an `ArbitraryNumber`.
+     * @throws `"step must be greater than zero"` when `step <= 0`.
      * @example
      * const canBuy = ArbitraryNumberHelpers.wholeMultipleCount(gold, upgradeCost);
      */
@@ -38,7 +49,7 @@ export class ArbitraryNumberHelpers {
         const numStep  = ArbitraryNumberHelpers.coerce(step);
 
         if (numStep.lessThanOrEqual(ArbitraryNumber.Zero)) {
-            throw new Error("step must be greater than zero");
+            throw new ArbitraryNumberInputError("step must be greater than zero", numStep.toNumber());
         }
 
         if (numTotal.lessThanOrEqual(ArbitraryNumber.Zero)) {
@@ -49,8 +60,12 @@ export class ArbitraryNumberHelpers {
     }
 
     /**
-     * Returns `value - delta` but never lower than `floor` (default `0`).
+     * Returns `value - delta`, clamped to a minimum of `floor` (default `0`).
      *
+     * @param value - The starting value.
+     * @param delta - The amount to subtract.
+     * @param floor - The minimum result. Defaults to `ArbitraryNumber.Zero`.
+     * @returns `max(value - delta, floor)`.
      * @example
      * health = ArbitraryNumberHelpers.subtractWithFloor(health, damage);
      */

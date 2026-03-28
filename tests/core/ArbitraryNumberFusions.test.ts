@@ -513,6 +513,7 @@ describe("sumArray — batch addition", () => {
             for (let i = 0; i < 50; i++) {
                 arr.push(raw(1.0 + i * 0.1, i % 10));
             }
+
             const sumResult = ArbitraryNumber.sumArray(arr);
             const chainResult = arr.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
             expect(approxEqual(sumResult, chainResult, 1e-8)).toBe(true);
@@ -568,6 +569,7 @@ describe("sumArray — batch addition", () => {
             for (let i = 0; i < 50; i++) {
                 sources.push(raw(1.0 + (i % 9) * 0.1, i % 8));
             }
+
             const sumResult = ArbitraryNumber.sumArray(sources);
             const chainResult = sources.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
             expect(approxEqual(sumResult, chainResult, 1e-8)).toBe(true);

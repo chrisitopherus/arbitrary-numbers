@@ -39,14 +39,6 @@ export class ArbitraryNumberGuard {
     }
 
     /**
-     * @deprecated Use {@link isNormalizedNumber} instead.
-     * @param obj - The value to test.
-     */
-    public static isScientificNotation(obj: unknown): obj is NormalizedNumber {
-        return ArbitraryNumberGuard.isNormalizedNumber(obj);
-    }
-
-    /**
      * Returns `true` if `obj` is an {@link ArbitraryNumber} with a value of zero.
      *
      * @param obj - The value to test.

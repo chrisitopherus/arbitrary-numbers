@@ -15,7 +15,7 @@
 import { bench, do_not_optimize, group, run, summary } from "mitata";
 import { ArbitraryNumber } from "../src/core/ArbitraryNumber";
 import { scientificNotation } from "../src/plugin/ScientificNotation";
-import { letterNotation } from "../src/plugin/LetterNotation";
+import { letterNotation } from "../src/plugin/AlphabetNotation";
 import { unitNotation } from "../src/plugin/UnitNotation";
 
 // ─── Pre-built operands ────────────────────────────────────────────────────
