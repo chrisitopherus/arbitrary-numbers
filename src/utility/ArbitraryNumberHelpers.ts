@@ -1,6 +1,6 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
 import type { ArbitraryNumberish } from "../types/utility";
-import { ArbitraryNumberOps} from "./ArbitraryNumberOps";
+import { ArbitraryNumberOps } from "./ArbitraryNumberOps";
 import { ArbitraryNumberInputError } from "../errors";
 
 /**
