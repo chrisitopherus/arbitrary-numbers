@@ -34,7 +34,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsup",
+    "build": "tsc --noEmit && vitest run && eslint src tests --fix && tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:ui": "vitest --ui",

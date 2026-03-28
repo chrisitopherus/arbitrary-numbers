@@ -21,9 +21,7 @@ export class ScientificNotation implements NotationPlugin {
      * @returns The formatted string.
      */
     public format(coefficient: number, exponent: number, decimals: number): string {
-        if (exponent === 0) {
-            return coefficient.toFixed(decimals);
-        }
+        if (exponent === 0) return coefficient.toFixed(decimals);
 
         const sign = exponent < 0 ? "-" : "+";
         return `${coefficient.toFixed(decimals)}e${sign}${Math.abs(exponent)}`;

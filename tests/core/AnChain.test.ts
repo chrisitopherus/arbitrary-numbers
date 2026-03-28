@@ -33,11 +33,6 @@ describe("chain() / AnChain.from() — construction", () => {
         expect(approxEqual(result, num(1500))).toBe(true);
     });
 
-    it("accepts a numeric string", () => {
-        const result = chain("250").done();
-        expect(approxEqual(result, num(250))).toBe(true);
-    });
-
     it("AnChain.from and chain() produce the same result", () => {
         const a = AnChain.from(num(42)).done();
         const b = chain(num(42)).done();

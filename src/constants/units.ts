@@ -1,9 +1,9 @@
 import { type Unit, type UnitArray } from "../types/plugin";
 
 /**
- * Full tier-indexed unit list from Thousand (tier 1, 10³) to Centillion (tier 101, 10³⁰³).
+ * Full tier-indexed unit list from Thousand (tier 1, 10^3) to Centillion (tier 101, 10^303).
  *
- * Array index = tier = `Math.floor(exponent / 3)`. Tiers 34–100 are `undefined` —
+ * Array index = tier = `Math.floor(exponent / 3)`. Tiers 34-100 are `undefined` -
  * numbers in that range fall through to whatever fallback is configured on the
  * {@link UnitNotation} instance (letterNotation for the pre-built `unitNotation`).
  *
@@ -14,7 +14,7 @@ import { type Unit, type UnitArray } from "../types/plugin";
  */
 export const CLASSIC_UNITS: UnitArray = (() => {
     const u: Array<Unit | undefined> = [
-        undefined,                                         // tier  0: exponent  0–2  (no unit)
+        undefined,                                         // tier  0: exponent  0-2  (no unit)
         { symbol: "K",    name: "Thousand" },             // tier  1: exponent  3
         { symbol: "M",    name: "Million" },              // tier  2: exponent  6
         { symbol: "B",    name: "Billion" },              // tier  3: exponent  9
@@ -48,14 +48,14 @@ export const CLASSIC_UNITS: UnitArray = (() => {
         { symbol: "Tg",   name: "Trigintillion" },        // tier 31: exponent 93
         { symbol: "UTg",  name: "Untrigintillion" },      // tier 32: exponent 96
         { symbol: "DTg",  name: "Duotrigintillion" },     // tier 33: exponent 99
-        // tiers 34–100: undefined — fallback fires for these exponents
+        // tiers 34-100: undefined - fallback fires for these exponents
     ];
     u[101] = { symbol: "Ct", name: "Centillion" };        // tier 101: exponent 303
     return Object.freeze(u);
 })();
 
 /**
- * Compact tier-indexed unit list from Thousand (tier 1, 10³) to Nonillion (tier 10, 10³⁰).
+ * Compact tier-indexed unit list from Thousand (tier 1, 10^3) to Nonillion (tier 10, 10^30).
  *
  * Intended for tight UI spaces. Tiers beyond 10 (exponent > 32) fall back to whatever
  * fallback plugin is configured on the {@link UnitNotation} instance.
@@ -66,7 +66,7 @@ export const CLASSIC_UNITS: UnitArray = (() => {
  * notation.format(1.5, 6, 2);  // "1.50 M"
  */
 export const COMPACT_UNITS: UnitArray = Object.freeze([
-    undefined,           // tier  0: exponent 0–2  (no unit)
+    undefined,           // tier  0: exponent 0-2  (no unit)
     { symbol: "k" },    // tier  1: exponent  3
     { symbol: "M" },    // tier  2: exponent  6
     { symbol: "B" },    // tier  3: exponent  9

@@ -1,14 +1,14 @@
 import { scientificNotation } from "../plugin/ScientificNotation";
-import { type NormalizedNumber } from "../types/core";
+import { type NormalizedNumber, type Signum } from "../types/core";
 import { type NotationPlugin } from "../types/plugin";
 import { pow10 } from "../constants/pow10";
 
 /**
- * An immutable number with effectively unlimited range, stored as `coefficient × 10^exponent`
+ * An immutable number with effectively unlimited range, stored as `coefficient * 10^exponent`
  * in normalised scientific notation.
  *
  * The coefficient is always in `[1, 10)` (or `0`). Addition short-circuits when the exponent
- * difference between operands exceeds {@link PrecisionCutoff} — the smaller value is below
+ * difference between operands exceeds {@link PrecisionCutoff} - the smaller value is below
  * the precision floor of the larger and is silently discarded.
  *
  * @example
@@ -28,10 +28,10 @@ export class ArbitraryNumber implements NormalizedNumber {
      * is negligible and silently skipped during addition/subtraction.
      *
      * When |exponent_diff| > PrecisionCutoff, the smaller operand contributes less than
-     * 10^-PrecisionCutoff of the result — below float64 coefficient precision for the default of 15.
+     * 10^-PrecisionCutoff of the result - below float64 coefficient precision for the default of 15.
      *
      * Default: 15 (matches float64 coefficient precision of ~15.95 significant digits).
-     * Game patterns: diffs 0–8 (exact), prestige 15–25 (loss <0.0001%), idle 20–50 (~0.1% loss).
+     * Game patterns: diffs 0-8 (exact), prestige 15-25 (loss <0.0001%), idle 20-50 (~0.1% loss).
      *
      * Override globally via assignment, or use {@link withPrecision} for a scoped block.
      */
@@ -48,7 +48,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Creates an `ArbitraryNumber` from a plain JavaScript `number`.
      *
      * Prefer this over `new ArbitraryNumber(value, 0)` when working with
-     * ordinary numeric literals — it reads clearly at the call site and
+     * ordinary numeric literals - it reads clearly at the call site and
      * validates the input.
      *
      * @example
@@ -69,7 +69,7 @@ export class ArbitraryNumber implements NormalizedNumber {
 
     /**
      * Constructs a new `ArbitraryNumber` and immediately normalises it so that
-     * `1 ≤ |coefficient| < 10` (or `coefficient === 0`).
+     * `1 <= |coefficient| < 10` (or `coefficient === 0`).
      *
      * @example
      * new ArbitraryNumber(15, 3); // stored as { coefficient: 1.5, exponent: 4 }
@@ -80,7 +80,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @throws `"ArbitraryNumber: exponent must be finite"` for non-finite exponents.
      */
     public constructor(coefficient: number, exponent: number) {
-        if (coefficient === 0 || coefficient === -0) {
+        if (coefficient === 0) {
             this.coefficient = 0;
             this.exponent = 0;
             return;
@@ -94,10 +94,10 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         const abs = Math.abs(coefficient);
         const shift = Math.floor(Math.log10(abs));
-        // Table lookup for shifts 0–15; fall back to Math.pow for out-of-range.
+        // Table lookup for shifts 0-15; fall back to Math.pow for out-of-range.
         const scale = pow10(shift);
         if (scale === 0) {
-            // Subnormal float — indistinguishable from zero at any practical precision.
+            // Subnormal float - indistinguishable from zero at any practical precision.
             this.coefficient = 0;
             this.exponent = 0;
             return;
@@ -112,7 +112,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      *
      * Uses Object.create() to bypass the constructor (zero normalisation cost).
      * Only valid when |coefficient| is already in [1, 10) and exponent is correct.
-     * Do NOT use for unnormalised inputs — call new ArbitraryNumber(c, e) instead.
+     * Do NOT use for unnormalised inputs - call new ArbitraryNumber(c, e) instead.
      */
     private static createNormalized(coefficient: number, exponent: number): ArbitraryNumber {
         // Object.create skips the constructor; coefficient/exponent are set here for the
@@ -126,9 +126,9 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Normalises raw (coefficient, exponent) into a new ArbitraryNumber.
      *
-     * INVARIANT: all ArbitraryNumber values must have coefficient ∈ [1, 10).
-     * Algorithm: shift = floor(log₁₀(|c|)); scale c by 10^-shift; adjust exponent.
-     * Cost: one Math.log10 call (~3–4 ns). This is the fundamental cost floor — logarithm
+     * INVARIANT: all ArbitraryNumber values must have coefficient in [1, 10).
+     * Algorithm: shift = floor(log10(|c|)); scale c by 10^-shift; adjust exponent.
+     * Cost: one Math.log10 call (~3-4 ns). This is the fundamental cost floor - logarithm
      * is the only way to compute magnitude in JavaScript.
      */
     private static normalizeFrom(c: number, e: number): ArbitraryNumber {
@@ -149,7 +149,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * operand has no effect and the larger is returned as-is.
      *
      * @example
-     * new ArbitraryNumber(1.5, 3).add(new ArbitraryNumber(2.5, 3)); // 4×10³
+     * new ArbitraryNumber(1.5, 3).add(new ArbitraryNumber(2.5, 3)); // 4*10^3
      */
     public add(other: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0) return other;
@@ -157,12 +157,12 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         const diff = this.exponent - other.exponent;
         // Fast-path: when |exponent diff| > PrecisionCutoff, the smaller operand contributes
-        // less than 10^-PrecisionCutoff of the result — below float64 coefficient precision.
+        // less than 10^-PrecisionCutoff of the result - below float64 coefficient precision.
         // Game math accepts this loss; returning the larger operand directly is both correct and faster.
         if (diff > ArbitraryNumber.PrecisionCutoff) return this;
         if (diff < -ArbitraryNumber.PrecisionCutoff) return other;
 
-        // Aligned sum — inlined to avoid intermediate NormalizedNumber object allocations.
+        // Aligned sum - inlined to avoid intermediate NormalizedNumber object allocations.
         let c: number;
         let e: number;
         if (diff >= 0) {
@@ -180,7 +180,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this - other`.
      *
      * @example
-     * new ArbitraryNumber(3.5, 3).sub(new ArbitraryNumber(1.5, 3)); // 2×10³
+     * new ArbitraryNumber(3.5, 3).sub(new ArbitraryNumber(1.5, 3)); // 2*10^3
      */
     public sub(other: ArbitraryNumber): ArbitraryNumber {
         if (other.coefficient === 0) return this;
@@ -206,17 +206,17 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns `this × other`.
+     * Returns `this * other`.
      *
      * @example
-     * new ArbitraryNumber(2, 3).mul(new ArbitraryNumber(3, 4)); // 6×10⁷
+     * new ArbitraryNumber(2, 3).mul(new ArbitraryNumber(3, 4)); // 6*10^7
      */
     public mul(other: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0 || other.coefficient === 0) return ArbitraryNumber.Zero;
 
         const c = this.coefficient * other.coefficient;
         const e = this.exponent + other.exponent;
-        // Both inputs are in [1,10) (or (−10,−1]), so |c| ∈ [1,100) — at most one step up.
+        // Both inputs are in [1,10) (or (-10,-1]), so |c| in [1,100) - at most one step up.
         const absC = c < 0 ? -c : c;
         if (absC >= 10) return ArbitraryNumber.createNormalized(c / 10, e + 1);
 
@@ -224,10 +224,10 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns `this ÷ other`.
+     * Returns `this / other`.
      *
      * @example
-     * new ArbitraryNumber(6, 7).div(new ArbitraryNumber(3, 4)); // 2×10³
+     * new ArbitraryNumber(6, 7).div(new ArbitraryNumber(3, 4)); // 2*10^3
      *
      * @throws `"Division by zero"` when `other` is zero.
      */
@@ -238,7 +238,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         const e = this.exponent - other.exponent;
         if (c === 0) return ArbitraryNumber.Zero;
 
-        // Both inputs are in [1,10) (or (−10,−1]), so |c| ∈ (0.1,10) — at most one step down.
+        // Both inputs are in [1,10) (or (-10,-1]), so |c| in (0.1,10) - at most one step down.
         const absC = c < 0 ? -c : c;
         if (absC < 1) return ArbitraryNumber.createNormalized(c * 10, e - 1);
 
@@ -249,7 +249,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns the arithmetic negation of this number (`-this`).
      *
      * @example
-     * new ArbitraryNumber(1.5, 3).negate(); // −1.5×10³
+     * new ArbitraryNumber(1.5, 3).negate(); // -1.5*10^3
      */
     public negate(): ArbitraryNumber {
         if (this.coefficient === 0) return ArbitraryNumber.Zero;
@@ -263,7 +263,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Returns `this` unchanged when the number is already non-negative.
      *
      * @example
-     * new ArbitraryNumber(-1.5, 3).abs(); // 1.5×10³
+     * new ArbitraryNumber(-1.5, 3).abs(); // 1.5*10^3
      */
     public abs(): ArbitraryNumber {
         if (this.coefficient >= 0) return this;
@@ -278,8 +278,8 @@ export class ArbitraryNumber implements NormalizedNumber {
      * `x^0` always returns {@link One}, including `0^0` (by convention).
      *
      * @example
-     * new ArbitraryNumber(2, 3).pow(2);  // 4×10⁶
-     * new ArbitraryNumber(2, 0).pow(-1); // 5×10⁻¹  (= 0.5)
+     * new ArbitraryNumber(2, 3).pow(2);  // 4*10^6
+     * new ArbitraryNumber(2, 0).pow(-1); // 5*10^-1  (= 0.5)
      *
      * @param n - The exponent to raise this number to.
      * @throws `"Zero cannot be raised to a negative power"` when this is zero and `n < 0`.
@@ -302,41 +302,41 @@ export class ArbitraryNumber implements NormalizedNumber {
         }
 
         // Fold any fractional part of (exponent * n) into the coefficient so the
-        // stored exponent stays integral. Suffix formatters require exponent % 3 ∈ {0,1,2}.
+        // stored exponent stays integral. Suffix formatters require exponent % 3 in {0,1,2}.
         const rawExp = this.exponent * n;
         const intExp = Math.floor(rawExp);
         const fracExp = rawExp - intExp;
         return new ArbitraryNumber(
-            Math.pow(this.coefficient, n) * Math.pow(10, fracExp),
+            Math.pow(this.coefficient, n) * pow10(fracExp),
             intExp,
         );
     }
 
     /**
-     * Fused multiply-add: `(this × multiplier) + addend`.
+     * Fused multiply-add: `(this * multiplier) + addend`.
      *
      * Faster than `.mul(multiplier).add(addend)` because it avoids allocating an
      * intermediate ArbitraryNumber for the product. One normalisation pass total.
      *
-     * Common pattern — prestige loop: `value = value.mulAdd(prestigeMultiplier, prestigeBoost)`
+     * Common pattern - prestige loop: `value = value.mulAdd(prestigeMultiplier, prestigeBoost)`
      *
      * @example
-     * // Equivalent to value.mul(mult).add(boost) but ~35–50% faster
+     * // Equivalent to value.mul(mult).add(boost) but ~35-50% faster
      * const prestiged = currentValue.mulAdd(multiplier, boost);
      */
     public mulAdd(multiplier: ArbitraryNumber, addend: ArbitraryNumber): ArbitraryNumber {
-        // Step 1: Multiply (this × multiplier).
-        // Both coefficients ∈ [1, 10) so the product ∈ [1, 100) — at most one normalisation step.
+        // Step 1: Multiply (this * multiplier).
+        // Both coefficients in [1, 10) so the product in [1, 100) - at most one normalisation step.
         if (this.coefficient === 0 || multiplier.coefficient === 0) return addend;
 
         let cp = this.coefficient * multiplier.coefficient;  // product coefficient
         let ep = this.exponent + multiplier.exponent;         // product exponent
 
-        // Normalise product: one comparison instead of Math.log10 (product always ∈ [1, 100))
+        // Normalise product: one comparison instead of Math.log10 (product always in [1, 100))
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; ep += 1; }
 
-        // Step 2: Add addend to the product — single normalisation pass for the whole operation.
+        // Step 2: Add addend to the product - single normalisation pass for the whole operation.
         if (addend.coefficient === 0) return ArbitraryNumber.createNormalized(cp, ep);
 
         const diff = ep - addend.exponent;
@@ -357,21 +357,21 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Fused add-multiply: `(this + addend) × multiplier`.
+     * Fused add-multiply: `(this + addend) * multiplier`.
      *
      * Faster than `.add(addend).mul(multiplier)` because it avoids allocating an
      * intermediate ArbitraryNumber for the sum. One normalisation pass total.
      *
-     * Common pattern — upgrade calculation: `newValue = baseValue.addMul(bonus, multiplier)`
+     * Common pattern - upgrade calculation: `newValue = baseValue.addMul(bonus, multiplier)`
      *
      * @example
-     * // Equivalent to base.add(bonus).mul(multiplier) but ~20–25% faster
+     * // Equivalent to base.add(bonus).mul(multiplier) but ~20-25% faster
      * const upgraded = baseValue.addMul(bonus, multiplier);
      */
     public addMul(addend: ArbitraryNumber, multiplier: ArbitraryNumber): ArbitraryNumber {
         if (multiplier.coefficient === 0) return ArbitraryNumber.Zero;
 
-        // Step 1: Sum (this + addend) — same logic as add() but we keep raw (c, e) to avoid allocation.
+        // Step 1: Sum (this + addend) - same logic as add() but we keep raw (c, e) to avoid allocation.
         let cs: number, es: number;  // sum coefficient and exponent
 
         if (this.coefficient === 0 && addend.coefficient === 0) return ArbitraryNumber.Zero;
@@ -399,7 +399,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         }
 
         // Step 2: Multiply the sum by multiplier.
-        // cs is now normalised ∈ [1, 10), so product ∈ [1, 100) — one comparison suffices.
+        // cs is now normalised in [1, 10), so product in [1, 100) - one comparison suffices.
         let cp = cs * multiplier.coefficient;
         const ep = es + multiplier.exponent;
         const absCp = cp < 0 ? -cp : cp;
@@ -409,15 +409,15 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Fused multiply-subtract: `(this × multiplier) − subtrahend`.
+     * Fused multiply-subtract: `(this * multiplier) - subtrahend`.
      *
      * Avoids one intermediate allocation vs `.mul(multiplier).sub(subtrahend)`.
      *
-     * Common pattern — resource drain: `income.mulSub(rate, upkeepCost)`
+     * Common pattern - resource drain: `income.mulSub(rate, upkeepCost)`
      */
     public mulSub(multiplier: ArbitraryNumber, subtrahend: ArbitraryNumber): ArbitraryNumber {
         if (this.coefficient === 0 || multiplier.coefficient === 0) {
-            // (0 × mult) − sub = −sub
+            // (0 * mult) - sub = -sub
             if (subtrahend.coefficient === 0) return ArbitraryNumber.Zero;
 
             return ArbitraryNumber.createNormalized(-subtrahend.coefficient, subtrahend.exponent);
@@ -449,11 +449,11 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Fused subtract-multiply: `(this − subtrahend) × multiplier`.
+     * Fused subtract-multiply: `(this - subtrahend) * multiplier`.
      *
      * Avoids one intermediate allocation vs `.sub(subtrahend).mul(multiplier)`.
      *
-     * Common pattern — upgrade after penalty: `health.subMul(damage, multiplier)`
+     * Common pattern - upgrade after penalty: `health.subMul(damage, multiplier)`
      */
     public subMul(subtrahend: ArbitraryNumber, multiplier: ArbitraryNumber): ArbitraryNumber {
         if (multiplier.coefficient === 0) return ArbitraryNumber.Zero;
@@ -462,7 +462,7 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         if (this.coefficient === 0 && subtrahend.coefficient === 0) return ArbitraryNumber.Zero;
         if (this.coefficient === 0) {
-            // (0 − sub) × mult = −sub × mult
+            // (0 - sub) * mult = -sub * mult
             cs = -subtrahend.coefficient; es = subtrahend.exponent;
         } else if (subtrahend.coefficient === 0) {
             cs = this.coefficient; es = this.exponent;
@@ -497,11 +497,11 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Fused divide-add: `(this ÷ divisor) + addend`.
+     * Fused divide-add: `(this / divisor) + addend`.
      *
      * Avoids one intermediate allocation vs `.div(divisor).add(addend)`.
      *
-     * Common pattern — efficiency bonus: `damage.divAdd(armor, flat)`
+     * Common pattern - efficiency bonus: `damage.divAdd(armor, flat)`
      *
      * @throws `"Division by zero"` when divisor is zero.
      */
@@ -533,14 +533,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Efficiently sums an array of ArbitraryNumbers in a single normalisation pass.
      *
-     * **Why it's fast:** standard chained `.add()` normalises after every element (N log₁₀ calls).
+     * **Why it's fast:** standard chained `.add()` normalises after every element (N log10 calls).
      * `sumArray` aligns all coefficients to the largest exponent (pivot), sums them,
-     * then normalises once — regardless of array size.
+     * then normalises once - regardless of array size.
      *
-     * For 50 elements: chained add ≈ 50 log₁₀ calls + 50 allocations;
-     * sumArray ≈ 50 divisions + 1 log₁₀ call + 1 allocation → ~9× faster.
+     * For 50 elements: chained add ~ 50 log10 calls + 50 allocations;
+     * sumArray ~ 50 divisions + 1 log10 call + 1 allocation -> ~9* faster.
      *
-     * Common pattern — income aggregation: `total = ArbitraryNumber.sumArray(incomeSourcesPerTick)`
+     * Common pattern - income aggregation: `total = ArbitraryNumber.sumArray(incomeSourcesPerTick)`
      *
      * @example
      * const total = ArbitraryNumber.sumArray(incomeSources); // far faster than .reduce((a, b) => a.add(b))
@@ -552,7 +552,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (len === 0) return ArbitraryNumber.Zero;
         if (len === 1) return numbers[0]!;
 
-        // Find the pivot exponent (largest) — sets the alignment anchor.
+        // Find the pivot exponent (largest) - sets the alignment anchor.
         // Values with exponent diff > PrecisionCutoff relative to the pivot are negligible.
         let pivotExp = numbers[0]!.exponent;
         for (let i = 1; i < len; i++) {
@@ -560,13 +560,13 @@ export class ArbitraryNumber implements NormalizedNumber {
             if (n.exponent > pivotExp) pivotExp = n.exponent;
         }
 
-        // Align all coefficients to the pivot exponent and accumulate — no log₁₀ yet.
+        // Align all coefficients to the pivot exponent and accumulate - no log10 yet.
         let total = 0;
         for (let i = 0; i < len; i++) {
             const n = numbers[i]!;
             if (n.coefficient === 0) continue;
 
-            const diff = pivotExp - n.exponent;   // always ≥ 0
+            const diff = pivotExp - n.exponent;   // always >= 0
             if (diff > ArbitraryNumber.PrecisionCutoff) continue;  // negligible vs pivot
 
             total += n.coefficient / pow10(diff);
@@ -590,7 +590,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      *
      * @example
      * new ArbitraryNumber(1, 4).compareTo(new ArbitraryNumber(9, 3)); // 1  (10000 > 9000)
-     * new ArbitraryNumber(-1, 4).compareTo(new ArbitraryNumber(1, 3)); // -1 (−10000 < 1000)
+     * new ArbitraryNumber(-1, 4).compareTo(new ArbitraryNumber(1, 3)); // -1 (-10000 < 1000)
      */
     public compareTo(other: ArbitraryNumber): number {
         const thisNegative = this.coefficient < 0;
@@ -604,7 +604,7 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (this.exponent !== other.exponent) {
             // Zero is stored as {coefficient: 0, exponent: 0}.  Without the guard below,
             // Zero.compareTo({c: 5, e: -1}) would hit the exponent branch and return 1
-            // (0 > −1) instead of the correct −1 (0 < 0.5).  The guard is inside the
+            // (0 > -1) instead of the correct -1 (0 < 0.5).  The guard is inside the
             // exponent-differs branch so the same-exponent hot path pays zero extra cost.
             if (this.coefficient === 0) return otherNegative ? 1 : -1;
             if (other.coefficient === 0) return thisNegative ? -1 : 1;
@@ -651,14 +651,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns the largest integer less than or equal to this number (floor toward −∞).
+     * Returns the largest integer less than or equal to this number (floor toward -Infinity).
      *
-     * Numbers with `exponent ≥ PrecisionCutoff` are already integers at that scale
+     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
      * and are returned unchanged.
      *
      * @example
      * new ArbitraryNumber(1.7, 0).floor();  // 1
-     * new ArbitraryNumber(-1.7, 0).floor(); // −2
+     * new ArbitraryNumber(-1.7, 0).floor(); // -2
      */
     public floor(): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -677,14 +677,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns the smallest integer greater than or equal to this number (ceil toward +∞).
+     * Returns the smallest integer greater than or equal to this number (ceil toward +Infinity).
      *
-     * Numbers with `exponent ≥ PrecisionCutoff` are already integers at that scale
+     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
      * and are returned unchanged.
      *
      * @example
      * new ArbitraryNumber(1.2, 0).ceil();  // 2
-     * new ArbitraryNumber(-1.7, 0).ceil(); // −1
+     * new ArbitraryNumber(-1.7, 0).ceil(); // -1
      */
     public ceil(): ArbitraryNumber {
         if (this.coefficient === 0) {
@@ -706,7 +706,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * Clamps `value` to the inclusive range `[min, max]`.
      *
      * @example
-     * ArbitraryNumber.clamp(new ArbitraryNumber(5, 2), new ArbitraryNumber(1, 3), new ArbitraryNumber(2, 3)); // 1×10³  (500 clamped to [1000, 2000])
+     * ArbitraryNumber.clamp(new ArbitraryNumber(5, 2), new ArbitraryNumber(1, 3), new ArbitraryNumber(2, 3)); // 1*10^3  (500 clamped to [1000, 2000])
      *
      * @param value - The value to clamp.
      * @param min - Lower bound (inclusive).
@@ -736,7 +736,7 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Linear interpolation: `a + (b − a) × t` where `t ∈ [0, 1]` is a plain number.
+     * Linear interpolation: `a + (b - a) * t` where `t in [0, 1]` is a plain number.
      *
      * Used for smooth animations and tweening in game UIs.
      * `t = 0` returns `a`; `t = 1` returns `b`.
@@ -772,14 +772,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns `log₁₀(this)` as a plain JavaScript `number`.
+     * Returns `log10(this)` as a plain JavaScript `number`.
      *
-     * Because the number is stored as `c × 10^e`, this is computed exactly as
-     * `log10(c) + e` — no precision loss from the exponent.
+     * Because the number is stored as `c * 10^e`, this is computed exactly as
+     * `log10(c) + e` - no precision loss from the exponent.
      *
      * @example
      * new ArbitraryNumber(1, 6).log10();    // 6
-     * new ArbitraryNumber(1.5, 3).log10();  // log10(1.5) + 3  ≈ 3.176
+     * new ArbitraryNumber(1.5, 3).log10();  // log10(1.5) + 3  ~ 3.176
      *
      * @throws `"Logarithm of zero is undefined"` when this is zero.
      * @throws `"Logarithm of a negative number is undefined"` when this is negative.
@@ -799,14 +799,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Returns √this.
      *
-     * Computed as pure coefficient math — no `Math.log10` call. Cost: one `Math.sqrt`.
-     * For even exponents: `sqrt(c) × 10^(e/2)`.
-     * For odd exponents: `sqrt(c × 10) × 10^((e−1)/2)`.
+     * Computed as pure coefficient math - no `Math.log10` call. Cost: one `Math.sqrt`.
+     * For even exponents: `sqrt(c) * 10^(e/2)`.
+     * For odd exponents: `sqrt(c * 10) * 10^((e-1)/2)`.
      *
      * @throws `"Square root of negative number"` when this is negative.
      * @example
      * new ArbitraryNumber(4, 0).sqrt();   // 2
-     * new ArbitraryNumber(1, 4).sqrt();   // 1×10²  (= 100)
+     * new ArbitraryNumber(1, 4).sqrt();   // 1*10^2  (= 100)
      */
     public sqrt(): ArbitraryNumber {
         if (this.coefficient < 0) throw new Error("Square root of negative number");
@@ -822,24 +822,27 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Returns the nearest integer value (rounds half-up).
      *
-     * Numbers with `exponent ≥ PrecisionCutoff` are already integers at that scale
+     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
      * and are returned unchanged.
      *
      * @example
      * new ArbitraryNumber(1.5, 0).round();  // 2
      * new ArbitraryNumber(1.4, 0).round();  // 1
-     * new ArbitraryNumber(-1.5, 0).round(); // −1 (half-up toward positive infinity)
+     * new ArbitraryNumber(-1.5, 0).round(); // -1 (half-up toward positive infinity)
      */
     public round(): ArbitraryNumber {
         if (this.coefficient === 0) return ArbitraryNumber.Zero;
         if (this.exponent >= ArbitraryNumber.PrecisionCutoff) return this;
+
         if (this.exponent < 0) {
-            // exponent <= -2: |value| < 0.1 → always rounds to 0
+            // exponent <= -2: |value| < 0.1 -> always rounds to 0
             if (this.exponent <= -2) return ArbitraryNumber.Zero;
 
-            // exponent === -1: value = coefficient × 0.1  (no Math.pow needed)
+            // exponent === -1: value = coefficient * 0.1  (no Math.pow needed)
             const rounded = Math.round(this.coefficient * 0.1);
-            return rounded === 0 ? ArbitraryNumber.Zero : new ArbitraryNumber(rounded, 0);
+            return rounded === 0
+                ? ArbitraryNumber.Zero
+                : new ArbitraryNumber(rounded, 0);
         }
 
         return new ArbitraryNumber(Math.round(this.coefficient * pow10(this.exponent)), 0);
@@ -853,23 +856,23 @@ export class ArbitraryNumber implements NormalizedNumber {
      * new ArbitraryNumber(-1.5, 3).sign(); // -1
      * ArbitraryNumber.Zero.sign();         // 0
      */
-    public sign(): -1 | 0 | 1 {
-        return (this.coefficient > 0 ? 1 : this.coefficient < 0 ? -1 : 0) as -1 | 0 | 1;
+    public sign(): Signum {
+        return Math.sign(this.coefficient) as Signum;
     }
 
     /**
      * Converts to a plain JavaScript `number`.
      *
      * Precision is limited to float64 (~15 significant digits).
-     * Returns `Infinity` for exponents beyond the float64 range (≥308).
-     * Returns `0` for exponents below the float64 range (≤-324).
+     * Returns `Infinity` for exponents beyond the float64 range (>=308).
+     * Returns `0` for exponents below the float64 range (<=-324).
      *
      * @example
      * new ArbitraryNumber(1.5, 3).toNumber();  // 1500
      * new ArbitraryNumber(1, 400).toNumber();  // Infinity
      */
     public toNumber(): number {
-        return this.coefficient * Math.pow(10, this.exponent);
+        return this.coefficient * pow10(this.exponent);
     }
 
     /** Returns `true` when this number is zero. */
@@ -883,16 +886,14 @@ export class ArbitraryNumber implements NormalizedNumber {
 
     /**
      * Returns `true` when this number has no fractional part.
-     * Numbers with `exponent ≥ PrecisionCutoff` are always considered integers.
+     * Numbers with `exponent >= PrecisionCutoff` are always considered integers.
      */
     public isInteger(): boolean {
         if (this.coefficient === 0) return true;
         if (this.exponent >= ArbitraryNumber.PrecisionCutoff) return true;
-        // A normalised coefficient is in [1, 10). For any negative exponent, the value
-        // is strictly in (0, 1) exclusive, which is never an integer.
         if (this.exponent < 0) return false;
 
-        // exponent ∈ [0, PrecisionCutoff-1] — covered by pow10 table (0–15)
+        // exponent in [0, PrecisionCutoff-1] - covered by pow10 table (0-15)
         return Number.isInteger(this.coefficient * pow10(this.exponent));
     }
 

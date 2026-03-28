@@ -8,7 +8,7 @@ import { SuffixNotationBase } from "./SuffixNotationBase";
  * (e.g. `"1.50 K"`, `"3.20 M"`, `"1.00 B"`).
  *
  * The `units` array is indexed by tier (`Math.floor(exponent / 3)`), so lookup
- * is O(1) — no search required. A `undefined` entry means "no unit for this tier";
+ * is O(1) - no search required. A `undefined` entry means "no unit for this tier";
  * the fallback plugin handles it.
  *
  * @example
@@ -20,7 +20,7 @@ import { SuffixNotationBase } from "./SuffixNotationBase";
  * number.toString(unitNotation);  // "1.50 K"
  */
 export class UnitNotation extends SuffixNotationBase {
-    protected readonly fallback: SuffixProvider | undefined;
+    protected readonly fallback?: SuffixProvider;
     protected readonly units: UnitArray;
 
     /**

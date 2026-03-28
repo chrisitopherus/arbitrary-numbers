@@ -1,5 +1,5 @@
 import { type NormalizedNumber } from "../types/core";
-import { POW10 } from "../constants/pow10";
+import { pow10 } from "../constants/pow10";
 
 /**
  * Low-level arithmetic helpers that operate on {@link NormalizedNumber} objects.
@@ -9,7 +9,7 @@ import { POW10 } from "../constants/pow10";
  */
 export class ArbitraryNumberArithmetic {
     /**
-     * Normalises a value so that `1 ≤ |coefficient| < 10` (or `coefficient === 0`, `exponent === 0`).
+     * Normalises a value so that `1 <= |coefficient| < 10` (or `coefficient === 0`, `exponent === 0`).
      *
      * @param number - The value to normalise.
      * @returns A new object with the coefficient shifted into `[1, 10)`.
@@ -19,18 +19,14 @@ export class ArbitraryNumberArithmetic {
      * normalize({ coefficient: 0,   exponent: 9 }); // { coefficient: 0,   exponent: 0 }
      */
     public static normalize(number: NormalizedNumber): NormalizedNumber {
-        if (number.coefficient === 0) {
-            return { coefficient: 0, exponent: 0 };
-        }
+        if (number.coefficient === 0) return { coefficient: 0, exponent: 0 };
 
         const shift = Math.floor(Math.log10(Math.abs(number.coefficient)));
-        const scale = (shift >= 0 && shift < 16) ? POW10[shift]! : Math.pow(10, shift);
+        const scale = pow10(shift);
 
-        // For subnormal floats (e.g. Number.MIN_VALUE ≈ 5e-324), 10^shift underflows to 0.
+        // For subnormal floats (e.g. Number.MIN_VALUE ~ 5e-324), 10^shift underflows to 0.
         // The value is indistinguishable from zero at any practical precision.
-        if (scale === 0) {
-            return { coefficient: 0, exponent: 0 };
-        }
+        if (scale === 0) return { coefficient: 0, exponent: 0 };
 
         return {
             coefficient: number.coefficient / scale,
@@ -44,12 +40,12 @@ export class ArbitraryNumberArithmetic {
      * The higher-exponent operand is kept as-is; the lower one is scaled down before
      * summing so both share the same exponent.
      *
-     * The result is **not** normalised — call {@link normalize} on the output.
+     * The result is **not** normalised - call {@link normalize} on the output.
      *
      * @param a - First operand.
      * @param b - Second operand.
      * @param exponentDiff - Pre-computed `a.exponent - b.exponent`.
-     *   Must satisfy `|exponentDiff| ≤ PrecisionCutoff`.
+     *   Must satisfy `|exponentDiff| <= PrecisionCutoff`.
      * @returns An unnormalised sum.
      *
      * @example
@@ -78,7 +74,7 @@ export class ArbitraryNumberArithmetic {
      * shiftCoefficientDown(1.5, 3); // 0.0015
      */
     public static shiftCoefficientDown(coefficient: number, places: number): number {
-        return coefficient / ((places >= 0 && places < 16) ? POW10[places]! : Math.pow(10, places));
+        return coefficient / (pow10(places));
     }
 
     /**
@@ -92,6 +88,6 @@ export class ArbitraryNumberArithmetic {
      * shiftCoefficientUp(1.5, 3); // 1500
      */
     public static shiftCoefficientUp(coefficient: number, places: number): number {
-        return coefficient * ((places >= 0 && places < 16) ? POW10[places]! : Math.pow(10, places));
+        return coefficient * (pow10(places));
     }
 }

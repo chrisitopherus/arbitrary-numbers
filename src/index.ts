@@ -3,7 +3,6 @@ export { ArbitraryNumber } from "./core/ArbitraryNumber";
 export { an } from "./core/an";
 export { AnChain, chain } from "./core/AnChain";
 export { AnFormula, formula } from "./core/AnFormula";
-export type { AnFunction } from "./core/an";
 
 // Plugins
 export { ScientificNotation, scientificNotation } from "./plugin/ScientificNotation";
@@ -25,6 +24,6 @@ export { ArbitraryNumberGuard as guard } from "./utility/ArbitraryNumberGuard";
 export { ArbitraryNumberHelpers as helpers } from "./utility/ArbitraryNumberHelpers";
 
 // Types
-export type { ArbitraryNumberish } from "./utility/ArbitraryNumberOps";
+export type { ArbitraryNumberish } from "./types/utility";
+export type { AnFunction, NormalizedNumber, Signum, Mod3 } from "./types/core";
 export type { NotationPlugin, SuffixProvider, SuffixNotationPlugin, SuffixNotationPluginOptions, AlphabetNotationOptions, Unit, UnitArray, UnitNotationOptions } from "./types/plugin";
-export type { NormalizedNumber } from "./types/core";

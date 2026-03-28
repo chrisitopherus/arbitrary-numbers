@@ -10,12 +10,12 @@ type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
  * and runs them only when {@link apply} is called.  The same formula can be
  * applied to any number of values without re-defining the pipeline.
  *
- * Each builder method returns a **new** `AnFormula` — the original is
+ * Each builder method returns a **new** `AnFormula` - the original is
  * unchanged.  This makes branching and composition safe:
  *
  * @example
  * const base      = formula().mul(an(2));
- * const withFloor = base.floor();   // new formula — base is unchanged
+ * const withFloor = base.floor();   // new formula - base is unchanged
  * const withCeil  = base.ceil();    // another branch from base
  *
  * @example
@@ -34,13 +34,13 @@ type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
  * const result    = full.apply(baseDamage);
  */
 export class AnFormula {
-    private readonly _name: string | undefined;
+    private readonly _name?: string;
     private readonly steps: ReadonlyArray<FormulaStep>;
 
     /**
      * Prefer the {@link formula} factory function over calling this directly.
      */
-    public constructor(name: string | undefined, steps: ReadonlyArray<FormulaStep>) {
+    public constructor(name?: string, steps: ReadonlyArray<FormulaStep> = []) {
         this._name = name;
         this.steps = steps;
     }
@@ -76,24 +76,24 @@ export class AnFormula {
     public add(other: ArbitraryNumber): AnFormula { return this.step(v => v.add(other)); }
     /** Appends `- other` to the pipeline. */
     public sub(other: ArbitraryNumber): AnFormula { return this.step(v => v.sub(other)); }
-    /** Appends `× other` to the pipeline. */
+    /** Appends `* other` to the pipeline. */
     public mul(other: ArbitraryNumber): AnFormula { return this.step(v => v.mul(other)); }
-    /** Appends `÷ other` to the pipeline. */
+    /** Appends `/ other` to the pipeline. */
     public div(other: ArbitraryNumber): AnFormula { return this.step(v => v.div(other)); }
     /** Appends `^ exp` to the pipeline. */
     public pow(exp: number): AnFormula { return this.step(v => v.pow(exp)); }
 
     // ── Fused (avoids one intermediate allocation per call) ───────────────────
 
-    /** Appends `(value × mult) + add` to the pipeline. */
+    /** Appends `(value * mult) + add` to the pipeline. */
     public mulAdd(mult: ArbitraryNumber, add: ArbitraryNumber): AnFormula { return this.step(v => v.mulAdd(mult, add)); }
-    /** Appends `(value + add) × mult` to the pipeline. */
+    /** Appends `(value + add) * mult` to the pipeline. */
     public addMul(add: ArbitraryNumber, mult: ArbitraryNumber): AnFormula { return this.step(v => v.addMul(add, mult)); }
-    /** Appends `(value × mult) − sub` to the pipeline. */
+    /** Appends `(value * mult) - sub` to the pipeline. */
     public mulSub(mult: ArbitraryNumber, sub: ArbitraryNumber): AnFormula { return this.step(v => v.mulSub(mult, sub)); }
-    /** Appends `(value − sub) × mult` to the pipeline. */
+    /** Appends `(value - sub) * mult` to the pipeline. */
     public subMul(sub: ArbitraryNumber, mult: ArbitraryNumber): AnFormula { return this.step(v => v.subMul(sub, mult)); }
-    /** Appends `(value ÷ div) + add` to the pipeline. */
+    /** Appends `(value / div) + add` to the pipeline. */
     public divAdd(div: ArbitraryNumber, add: ArbitraryNumber): AnFormula { return this.step(v => v.divAdd(div, add)); }
 
     // ── Unary ─────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ export class AnFormula {
     /**
      * Runs this formula's pipeline against `value` and returns the result.
      *
-     * The formula itself is unchanged — call `apply` as many times as needed.
+     * The formula itself is unchanged - call `apply` as many times as needed.
      *
      * @param value - The starting value. Plain `number` is coerced via `ArbitraryNumber.from`.
      * @throws `"ArbitraryNumber.from: value must be finite"` when a plain `number` is non-finite.
@@ -144,9 +144,11 @@ export class AnFormula {
         let result: ArbitraryNumber = value instanceof ArbitraryNumber
             ? value
             : ArbitraryNumber.from(value);
+            
         for (const step of this.steps) {
             result = step(result);
         }
+
         return result;
     }
 }
@@ -154,7 +156,7 @@ export class AnFormula {
 /**
  * Creates an {@link AnFormula} pipeline, optionally named.
  *
- * Build the pipeline by chaining methods — each returns a new `AnFormula`
+ * Build the pipeline by chaining methods - each returns a new `AnFormula`
  * so the original is always safe to branch or reuse.  Call {@link AnFormula.apply}
  * to run the pipeline against a value.
  *
@@ -163,7 +165,7 @@ export class AnFormula {
  * import { formula, an } from 'arbitrary-numbers';
  *
  * const armorReduction = formula("Armor Reduction")
- *     .subMul(armor, an(0.75))   // (base − armor) × 0.75
+ *     .subMul(armor, an(0.75))   // (base - armor) * 0.75
  *     .floor();
  *
  * const critBonus = formula("Crit Bonus").mul(critMult).ceil();

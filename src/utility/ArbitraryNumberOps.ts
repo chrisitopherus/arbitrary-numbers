@@ -1,6 +1,5 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-
-export type ArbitraryNumberish = ArbitraryNumber | number;
+import type { ArbitraryNumberish } from "../types/utility";
 
 /**
  * Convenience helpers for mixed `number | ArbitraryNumber` inputs.
@@ -8,7 +7,7 @@ export type ArbitraryNumberish = ArbitraryNumber | number;
  * Each method accepts either type and coerces plain `number` values via
  * {@link ArbitraryNumber.from} before delegating to the corresponding instance method.
  *
- * Prefer `ArbitraryNumber` instance methods directly on hot paths — this class is
+ * Prefer `ArbitraryNumber` instance methods directly on hot paths - this class is
  * intended for system boundaries (event handlers, serialisation, UI callbacks) where
  * the input type is unknown.
  *
@@ -54,7 +53,7 @@ export class ArbitraryNumberOps {
     }
 
     /**
-     * Returns `left × right`, coercing both operands as needed.
+     * Returns `left * right`, coercing both operands as needed.
      *
      * @param left - The multiplicand.
      * @param right - The multiplier.
@@ -66,7 +65,7 @@ export class ArbitraryNumberOps {
     }
 
     /**
-     * Returns `left ÷ right`, coercing both operands as needed.
+     * Returns `left / right`, coercing both operands as needed.
      *
      * @param left - The dividend.
      * @param right - The divisor.
@@ -98,7 +97,7 @@ export class ArbitraryNumberOps {
      * @param min - The lower bound (inclusive).
      * @param max - The upper bound (inclusive).
      * @example
-     * ops.clamp(500, 1000, 2000) // ArbitraryNumber (1000)  — below min, returns min
+     * ops.clamp(500, 1000, 2000) // ArbitraryNumber (1000)  - below min, returns min
      */
     public static clamp(value: ArbitraryNumberish, min: ArbitraryNumberish, max: ArbitraryNumberish): ArbitraryNumber {
         return ArbitraryNumber.clamp(

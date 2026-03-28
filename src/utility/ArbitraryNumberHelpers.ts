@@ -1,10 +1,11 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-import { ArbitraryNumberOps, type ArbitraryNumberish } from "./ArbitraryNumberOps";
+import type { ArbitraryNumberish } from "../types/utility";
+import { ArbitraryNumberOps} from "./ArbitraryNumberOps";
 
 /**
  * Domain-level helpers for common game and simulation patterns.
  *
- * These sit above the core arithmetic layer — each method accepts
+ * These sit above the core arithmetic layer - each method accepts
  * mixed input (`number | ArbitraryNumber`) via
  * {@link ArbitraryNumberOps.from} so they work at system boundaries
  * where you may receive raw numbers.

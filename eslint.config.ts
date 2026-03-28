@@ -17,8 +17,9 @@ export default tseslint.config(
 
             "padding-line-between-statements": [
                 "error",
-                { blankLine: "always", prev: "if", next: "*"  },
-                { blankLine: "any",    prev: "if", next: "if" },
+                { blankLine: "always", prev: "if",      next: "*"      },
+                { blankLine: "any",    prev: "if",      next: "if"     },
+                { blankLine: "always", prev: ["for", "while", "do"], next: "*" },
             ],
 
             "@typescript-eslint/explicit-member-accessibility": [

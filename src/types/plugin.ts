@@ -27,7 +27,7 @@ export interface NotationPlugin {
 /**
  * Minimal interface for anything that can map a tier to a suffix string.
  *
- * Used as the `fallback` type on {@link UnitNotation} — only `getSuffix` is
+ * Used as the `fallback` type on {@link UnitNotation} - only `getSuffix` is
  * ever called, so a simple object literal is enough:
  *
  * @example
@@ -46,7 +46,7 @@ export interface SuffixProvider {
 }
 
 /**
- * A full suffix-based {@link NotationPlugin} — combines formatting and suffix lookup.
+ * A full suffix-based {@link NotationPlugin} - combines formatting and suffix lookup.
  *
  * Extend {@link SuffixNotationBase} rather than implementing this interface directly.
  */
@@ -62,7 +62,7 @@ export interface SuffixNotationPluginOptions {
      * Defaults to `""` for most plugins. {@link UnitNotation} overrides this to `" "`,
      * so `new UnitNotation({ units })` produces `"1.50 K"` without an explicit separator.
      *
-     * @example " " → "1.50 K"  |  "" → "1.50K"
+     * @example " " -> "1.50 K"  |  "" -> "1.50K"
      */
     separator?: string;
 }
@@ -70,12 +70,12 @@ export interface SuffixNotationPluginOptions {
 /**
  * A display label for one tier of magnitude, used by {@link UnitNotation}.
  *
- * Units are stored in a **tier-indexed array** — the array index is the tier number,
+ * Units are stored in a **tier-indexed array** - the array index is the tier number,
  * where `tier = Math.floor(exponent / 3)`. Tier 1 = thousands, tier 2 = millions, etc.
  * The exponent is therefore implicit: `exponent = tier * 3`.
  *
  * @example
- * // In a tier-indexed array, index 2 represents 10⁶ (millions):
+ * // In a tier-indexed array, index 2 represents 10^6 (millions):
  * const units: UnitArray = [undefined, { symbol: "K" }, { symbol: "M" }];
  */
 export interface Unit {
@@ -89,7 +89,7 @@ export interface Unit {
  * A tier-indexed array of units for use with {@link UnitNotation}.
  *
  * The array index equals the tier number (`Math.floor(exponent / 3)`).
- * `undefined` at an index signals "no unit for this tier" — the fallback plugin
+ * `undefined` at an index signals "no unit for this tier" - the fallback plugin
  * (or plain fixed-point rendering) will be used instead.
  *
  * Sparse arrays are valid: unset indices are implicitly `undefined`.
@@ -111,7 +111,7 @@ export interface AlphabetNotationOptions extends SuffixNotationPluginOptions {
      * The ordered symbol set used to build multi-character suffixes.
      *
      * The algorithm is base-N positional: tier 1 = `alphabet[0]`, tier N = `alphabet[N-1]`,
-     * tier N+1 = `alphabet[0]+alphabet[0]`, and so on — identical to Excel column naming
+     * tier N+1 = `alphabet[0]+alphabet[0]`, and so on - identical to Excel column naming
      * when `alphabet` is `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"`.
      *
      * @default `"abcdefghijklmnopqrstuvwxyz"`
@@ -126,18 +126,18 @@ export interface UnitNotationOptions extends SuffixNotationPluginOptions {
     /**
      * Tier-indexed array of units. The array index equals the tier number
      * (`Math.floor(exponent / 3)`). Use `undefined` at an index to signal
-     * "no unit for this tier" — the fallback plugin will be used instead.
+     * "no unit for this tier" - the fallback plugin will be used instead.
      *
      * @example
      * // index 0 = tier 0 (< 1000, no suffix)
-     * // index 1 = tier 1 (thousands) → "K"
-     * // index 2 = tier 2 (millions)  → "M"
+     * // index 1 = tier 1 (thousands) -> "K"
+     * // index 2 = tier 2 (millions)  -> "M"
      */
     units: UnitArray;
     /**
      * Suffix provider used when no unit is defined for a tier.
      *
-     * Only {@link SuffixProvider.getSuffix} is called — the number and separator are
+     * Only {@link SuffixProvider.getSuffix} is called - the number and separator are
      * still formatted by this `UnitNotation` instance, keeping presentation consistent.
      * A simple object literal with just `getSuffix` is sufficient; a full plugin is not required.
      *
