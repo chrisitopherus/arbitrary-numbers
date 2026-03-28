@@ -55,7 +55,7 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
 
         const tier = Math.floor(exponent / 3);
         const remainder = (exponent - tier * 3) as Mod3;
-        const displayC = coefficient * this.displayScale[remainder];;
+        const displayC = coefficient * this.displayScale[remainder];
         const suffix = this.getSuffix(tier);
 
         if (!suffix) return displayC.toFixed(decimals);
