@@ -1,5 +1,8 @@
 // Core
 export { ArbitraryNumber } from "./core/ArbitraryNumber";
+
+// Errors
+export { ArbitraryNumberError, ArbitraryNumberInputError, ArbitraryNumberDomainError } from "./errors";
 export { an } from "./core/an";
 export { AnChain, chain } from "./core/AnChain";
 export { AnFormula, formula } from "./core/AnFormula";

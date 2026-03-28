@@ -2,6 +2,7 @@ import { scientificNotation } from "../plugin/ScientificNotation";
 import { type NormalizedNumber, type Signum } from "../types/core";
 import { type NotationPlugin } from "../types/plugin";
 import { pow10 } from "../constants/pow10";
+import { ArbitraryNumberInputError, ArbitraryNumberDomainError } from "../errors";
 
 /**
  * An immutable number with effectively unlimited range, stored as `coefficient * 10^exponent`
@@ -61,7 +62,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public static from(value: number): ArbitraryNumber {
         if (!isFinite(value)) {
-            throw new Error("ArbitraryNumber.from: value must be finite");
+            throw new ArbitraryNumberInputError("ArbitraryNumber.from: value must be finite", value);
         }
 
         return new ArbitraryNumber(value, 0);
@@ -86,10 +87,10 @@ export class ArbitraryNumber implements NormalizedNumber {
             return;
         }
         if (!isFinite(coefficient)) {
-            throw new Error("ArbitraryNumber: coefficient must be finite");
+            throw new ArbitraryNumberInputError("ArbitraryNumber: coefficient must be finite", coefficient);
         }
         if (!isFinite(exponent)) {
-            throw new Error("ArbitraryNumber: exponent must be finite");
+            throw new ArbitraryNumberInputError("ArbitraryNumber: exponent must be finite", exponent);
         }
 
         const abs = Math.abs(coefficient);
@@ -232,7 +233,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @throws `"Division by zero"` when `other` is zero.
      */
     public div(other: ArbitraryNumber): ArbitraryNumber {
-        if (other.coefficient === 0) throw new Error("Division by zero");
+        if (other.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber() });
 
         const c = this.coefficient / other.coefficient;
         const e = this.exponent - other.exponent;
@@ -291,14 +292,14 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         if (this.coefficient === 0) {
             if (n < 0) {
-                throw new Error("Zero cannot be raised to a negative power");
+                throw new ArbitraryNumberDomainError("Zero cannot be raised to a negative power", { exponent: n });
             }
 
             return ArbitraryNumber.Zero;
         }
 
         if (this.coefficient < 0 && !Number.isInteger(n)) {
-            throw new Error("ArbitraryNumber.pow: fractional exponent of a negative base is not supported");
+            throw new ArbitraryNumberDomainError("ArbitraryNumber.pow: fractional exponent of a negative base is not supported", { base: this.toNumber(), exponent: n });
         }
 
         // Fold any fractional part of (exponent * n) into the coefficient so the
@@ -506,7 +507,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * @throws `"Division by zero"` when divisor is zero.
      */
     public divAdd(divisor: ArbitraryNumber, addend: ArbitraryNumber): ArbitraryNumber {
-        if (divisor.coefficient === 0) throw new Error("Division by zero");
+        if (divisor.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber() });
 
         // Step 1: Divide (mirrors div() without creating an ArbitraryNumber)
         if (this.coefficient === 0) return addend;
@@ -786,11 +787,11 @@ export class ArbitraryNumber implements NormalizedNumber {
      */
     public log10(): number {
         if (this.coefficient === 0) {
-            throw new Error("Logarithm of zero is undefined");
+            throw new ArbitraryNumberDomainError("Logarithm of zero is undefined", { value: 0 });
         }
 
         if (this.coefficient < 0) {
-            throw new Error("Logarithm of a negative number is undefined");
+            throw new ArbitraryNumberDomainError("Logarithm of a negative number is undefined", { value: this.toNumber() });
         }
 
         return Math.log10(this.coefficient) + this.exponent;
@@ -809,7 +810,7 @@ export class ArbitraryNumber implements NormalizedNumber {
      * new ArbitraryNumber(1, 4).sqrt();   // 1*10^2  (= 100)
      */
     public sqrt(): ArbitraryNumber {
-        if (this.coefficient < 0) throw new Error("Square root of negative number");
+        if (this.coefficient < 0) throw new ArbitraryNumberDomainError("Square root of negative number", { value: this.toNumber() });
         if (this.coefficient === 0) return ArbitraryNumber.Zero;
         if (this.exponent % 2 !== 0) {
             // Odd exponent: shift one factor of 10 into the coefficient

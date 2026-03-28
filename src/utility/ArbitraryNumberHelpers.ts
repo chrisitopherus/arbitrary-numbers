@@ -1,6 +1,7 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
 import type { ArbitraryNumberish } from "../types/utility";
 import { ArbitraryNumberOps} from "./ArbitraryNumberOps";
+import { ArbitraryNumberInputError } from "../errors";
 
 /**
  * Domain-level helpers for common game and simulation patterns.
@@ -48,7 +49,7 @@ export class ArbitraryNumberHelpers {
         const numStep  = ArbitraryNumberHelpers.coerce(step);
 
         if (numStep.lessThanOrEqual(ArbitraryNumber.Zero)) {
-            throw new Error("step must be greater than zero");
+            throw new ArbitraryNumberInputError("step must be greater than zero", numStep.toNumber());
         }
 
         if (numTotal.lessThanOrEqual(ArbitraryNumber.Zero)) {

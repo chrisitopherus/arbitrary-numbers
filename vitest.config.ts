@@ -9,8 +9,8 @@ export default defineConfig({
       exclude: [
         "src/dev.ts",
         "src/index.ts",
-        "src/types/**",       // interface-only files, no runnable JS
-        "src/constants/**",   // pure data, no logic to cover
+        "src/types/**",
+        "src/constants/**",
       ],
       reporter: ["text", "lcov"],
       thresholds: {
