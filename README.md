@@ -10,7 +10,7 @@
   [![Zero dependencies](https://img.shields.io/badge/dependencies-zero-6366f1?labelColor=0c0c0e)](package.json)
 </div>
 
-`arbitrary-numbers` fills a specific gap: JavaScript's `Number` type silently loses precision above `Number.MAX_SAFE_INTEGER`, and `BigInt` doesn't support decimals or fast arithmetic over huge exponents.
+`arbitrary-numbers` fills a specific gap: JavaScript's `Number` type silently loses precision above `Number.MAX_SAFE_INTEGER`, and `BigInt` can't represent decimals, so working with extremely large or small magnitudes often requires manual scaling into very large integers.
 
 Numbers are stored as a normalized `coefficient × 10^exponent` pair. That makes arithmetic across wildly different scales fast and predictable — exactly what idle games and simulations need when values span from `1` to `10^300` in the same loop.
 
