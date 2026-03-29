@@ -67,7 +67,7 @@ console.log(`Damage (chain + fused subMul)  -> ${damage.toString(unitNotation)}`
 console.log(`Gold after 3 ticks (formula)   -> ${gold.toString(unitNotation)}`);
 ```
 
-Output from running `npx tsx examples/quickstart.ts`:
+Example output when running this in a repository checkout (for example with `npx tsx examples/quickstart.ts`):
 
 ```text
 === Range limits (JS vs arbitrary-numbers) ===
@@ -466,13 +466,13 @@ A self-contained simulation showing hyper-growth, fused ops, helpers, and where 
 
 ```typescript
 import {
-    ArbitraryNumber,
     an, chain,
     UnitNotation,
     CLASSIC_UNITS,
     letterNotation,
     ArbitraryNumberHelpers as helpers,
 } from "arbitrary-numbers";
+import type { ArbitraryNumber } from "arbitrary-numbers";
 
 let gold = an(5, 6);      // 5,000,000
 let gps = an(2, 5);       // 200,000 per tick
@@ -548,7 +548,7 @@ start gold=5.00 M  gps=200.00 K  reactorCost=1.00 B
 [t=  60] REACTOR   # 1  gps 200.00 K -> 2.00 No  nextCost=8.00 B
 [t= 120] REACTOR   # 2  gps 2.00 No -> 20.00 SpDc  nextCost=64.00 B
 [t= 120] SNAPSHOT  gold=    14.94 Dc  gps=  20.00 SpDc
-[t= 180] REACTOR   # 3  gps 20.00 SpDc -> 200.00 QiVg  nextCost=512.00 B        
+[t= 180] REACTOR   # 3  gps 20.00 SpDc -> 200.00 QiVg  nextCost=512.00 B
 [t= 240] REACTOR   # 4  gps 200.00 QiVg -> 2.00 ai  nextCost=4.10 T
 [t= 240] PRESTIGE  gps 2.00 ai -> 20.00 aj
 [t= 240] SNAPSHOT  gold=   1.49 SpVg  gps=    20.00 aj

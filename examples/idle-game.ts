@@ -1,5 +1,4 @@
 import {
-    ArbitraryNumber,
     an,
     chain,
     UnitNotation,
@@ -7,6 +6,7 @@ import {
     letterNotation,
     ArbitraryNumberHelpers as helpers,
 } from "../src/index.ts";
+import type { ArbitraryNumber } from "../src/index.ts";
 
 let gold = an(5, 6);      // 5,000,000
 let gps = an(2, 5);       // 200,000 per tick
