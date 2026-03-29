@@ -33,31 +33,52 @@ Requires TypeScript `"strict": true`.
 ```typescript
 import { an, chain, formula, unitNotation } from "arbitrary-numbers";
 
-// Exact at any scale, no overflow or silent precision loss
-const base  = an(1, 9);  // 1,000,000,000
-const armor = an(2, 6);  //     2,000,000
-let   gold  = an(5, 6);  //     5,000,000
+// JavaScript range limits
+const jsHuge = Number("1e500");  // Infinity
+const jsTiny = Number("1e-500"); // 0
 
-// Damage formula: (base - armor) * 0.75
-const damage = chain(base)
-    .subMul(armor, an(7.5, -1))
+// Arbitrary range in both directions
+const huge = an(1, 500);
+const tiny = an(1, -500);
+
+// One-off pipeline with chain(): (6.2e15 - 8.5e13) * 0.75
+const damage = chain(an(6.2, 15))
+    .subMul(an(8.5, 13), an(7.5, -1))
     .floor()
     .done();
 
-damage.toString(unitNotation)  // "748.50 M"
+// Reusable per-tick formula: gold = (gold * 1.08) + 2_500_000
+const tick = formula("tick").mulAdd(an(1.08), an(2.5, 6));
 
-// Per-tick update: fused op, one allocation instead of two
-gold = gold.mulAdd(an(1.05), an(1, 4));  // (gold * 1.05) + 10,000
+let gold = an(7.5, 12);
+for (let i = 0; i < 3; i += 1) {
+    gold = tick.apply(gold);
+}
 
-// Reusable formula pipeline applied to multiple values
-const applyArmor = formula("Armor").subMul(armor, an(7.5, -1)).floor();
-const physDamage = applyArmor.apply(base);
-const magDamage  = applyArmor.apply(an(8, 8));
+console.log("=== Range limits (JS vs arbitrary-numbers) ===");
+console.log(`JS Number('1e500')  -> ${jsHuge}`);
+console.log(`AN an(1, 500)       -> ${huge.toString()}`);
+console.log(`JS Number('1e-500') -> ${jsTiny}`);
+console.log(`AN an(1, -500)      -> ${tiny.toString()}`);
 
-// Formatting adapts at every scale automatically
-an(1.5, 3).toString(unitNotation)  // "1.50 K"
-an(1.5, 6).toString(unitNotation)  // "1.50 M"
-an(1.5, 9).toString(unitNotation)  // "1.50 B"
+console.log("");
+console.log("=== Game math helpers ===");
+console.log(`Damage (chain + fused subMul)  -> ${damage.toString(unitNotation)}`);
+console.log(`Gold after 3 ticks (formula)   -> ${gold.toString(unitNotation)}`);
+```
+
+Output from running `npx tsx examples/quickstart.ts`:
+
+```text
+=== Range limits (JS vs arbitrary-numbers) ===
+JS Number('1e500')  -> Infinity
+AN an(1, 500)       -> 1.00e+500
+JS Number('1e-500') -> 0
+AN an(1, -500)      -> 1.00e-500
+
+=== Game math helpers ===
+Damage (chain + fused subMul)  -> 4.59 Qa
+Gold after 3 ticks (formula)   -> 9.45 T
 ```
 
 ## Table of contents
@@ -441,67 +462,117 @@ an(3.2, 6).toString(new TierNotation({ separator: " " }))  // "3.20 M"
 
 ## Idle game example
 
-A self-contained simulation showing `an()`, fused ops, `chain()`, helpers, and `unitNotation` working together.
+A self-contained simulation showing hyper-growth, fused ops, helpers, and where plain JS `number` overflows while `ArbitraryNumber` keeps working.
 
 ```typescript
 import {
-    ArbitraryNumber, an, chain,
-    unitNotation, ArbitraryNumberHelpers as helpers,
+    ArbitraryNumber,
+    an, chain,
+    UnitNotation,
+    CLASSIC_UNITS,
+    letterNotation,
+    ArbitraryNumberHelpers as helpers,
 } from "arbitrary-numbers";
 
-let gold       = ArbitraryNumber.Zero;
-let goldPerSec = an(1);
+let gold = an(5, 6);      // 5,000,000
+let gps = an(2, 5);       // 200,000 per tick
+let reactorCost = an(1, 9);
+let reactors = 0;
 
-const UPGRADES = [
-    { label: "Copper Pick  ", cost: an(50),    mult: an(5)    },
-    { label: "Iron Mine    ", cost: an(1, 3),  mult: an(20)   },
-    { label: "Gold Refinery", cost: an(5, 6),  mult: an(1, 4) },
-] as const;
+const display = new UnitNotation({
+    units: CLASSIC_UNITS,
+    fallback: letterNotation,
+});
 
-function tick(): void {
-    gold = gold.add(goldPerSec);
+function fmt(value: ArbitraryNumber, decimals = 2): string {
+    return value.toString(display, decimals);
 }
 
-function tryBuyAll(): void {
-    for (const u of UPGRADES) {
-        if (!helpers.meetsOrExceeds(gold, u.cost)) continue;
-        gold       = gold.sub(u.cost);
-        goldPerSec = goldPerSec.mul(u.mult);
-        console.log(`  bought ${u.label}  GPS: ${goldPerSec.toString(unitNotation)}`);
+function snapshot(tick: number): void {
+    console.log(
+        `[t=${String(tick).padStart(4)}] SNAPSHOT  `
+        + `gold=${fmt(gold, 2).padStart(12)}  gps=${fmt(gps, 2).padStart(12)}`,
+    );
+}
+
+console.log("=== Hyper-growth idle loop (720 ticks) ===");
+console.log(`start gold=${fmt(gold)}  gps=${fmt(gps)}  reactorCost=${fmt(reactorCost)}`);
+
+for (let t = 1; t <= 720; t += 1) {
+    // Core growth: gold = (gold * 1.12) + gps
+    gold = gold.mulAdd(an(1.12), gps);
+
+    if (t % 60 === 0 && helpers.meetsOrExceeds(gold, reactorCost)) {
+        const before = gps;
+        gold = gold.sub(reactorCost);
+        gps = chain(gps).mul(an(1, 25)).floor().done();
+        reactorCost = reactorCost.mul(an(8));
+        reactors += 1;
+
+        console.log(
+            `[t=${String(t).padStart(4)}] REACTOR   #${String(reactors).padStart(2)}  `
+            + `gps ${fmt(before)} -> ${fmt(gps)}  `
+            + `nextCost=${fmt(reactorCost)}`,
+        );
+    }
+
+    if (t === 240 || t === 480) {
+        const before = gps;
+        gps = chain(gps)
+            .mul(an(1, 4))
+            .add(an(7.5, 6))
+            .floor()
+            .done();
+        console.log(`[t=${String(t).padStart(4)}] PRESTIGE  gps ${fmt(before)} -> ${fmt(gps)}`);
+    }
+
+    if (t % 120 === 0) {
+        snapshot(t);
     }
 }
 
-function prestige(multiplier: ArbitraryNumber): void {
-    goldPerSec = chain(goldPerSec)
-        .mulAdd(multiplier, an(1))  // (gps * mult) + 1, fused
-        .floor()
-        .done();
-    console.log(`  prestige!  new GPS: ${goldPerSec.toString(unitNotation)}`);
-}
-
-for (let t = 1; t <= 1_000_000; t++) {
-    tick();
-    if (t % 10 === 0)      tryBuyAll();
-    if (t === 51_000)      prestige(an(1.5));
-    if (t % 250_000 === 0) {
-        const g   = gold.toString(unitNotation, 3);
-        const gps = goldPerSec.toString(unitNotation, 3);
-        console.log(`[t=${String(t).padStart(9)}]  gold: ${g.padStart(12)}  gps: ${gps}`);
-    }
-}
+console.log("\n=== Final scale check ===");
+console.log(`reactors bought: ${reactors}`);
+console.log(`final gold (unit+letter): ${fmt(gold)}`);
+console.log(`final gps  (unit+letter): ${fmt(gps)}`);
+console.log(`final gold as JS Number: ${gold.toNumber()}`);
+console.log(`final gps as JS Number : ${gps.toNumber()}`);
+console.log("If JS shows Infinity while unit+letter output stays finite, the library is doing its job.");
 ```
 
 Output:
 
-```
-  bought Copper Pick    GPS: 5.00
-  bought Iron Mine      GPS: 100.00
-  bought Gold Refinery  GPS: 1.00 M
-  prestige!  new GPS: 1.50 M
-[t=  250000]  gold:  199.750 B  gps: 1.500 M
-[t=  500000]  gold:  574.750 B  gps: 1.500 M
-[t=  750000]  gold:  949.750 B  gps: 1.500 M
-[t= 1000000]  gold:    1.325 T  gps: 1.500 M
+```text
+=== Hyper-growth idle loop (720 ticks) ===
+start gold=5.00 M  gps=200.00 K  reactorCost=1.00 B
+[t=  60] REACTOR   # 1  gps 200.00 K -> 2.00 No  nextCost=8.00 B
+[t= 120] REACTOR   # 2  gps 2.00 No -> 20.00 SpDc  nextCost=64.00 B
+[t= 120] SNAPSHOT  gold=    14.94 Dc  gps=  20.00 SpDc
+[t= 180] REACTOR   # 3  gps 20.00 SpDc -> 200.00 QiVg  nextCost=512.00 B        
+[t= 240] REACTOR   # 4  gps 200.00 QiVg -> 2.00 ai  nextCost=4.10 T
+[t= 240] PRESTIGE  gps 2.00 ai -> 20.00 aj
+[t= 240] SNAPSHOT  gold=   1.49 SpVg  gps=    20.00 aj
+[t= 300] REACTOR   # 5  gps 20.00 aj -> 200.00 ar  nextCost=32.77 T
+[t= 360] REACTOR   # 6  gps 200.00 ar -> 2.00 ba  nextCost=262.14 T
+[t= 360] SNAPSHOT  gold=     1.49 at  gps=     2.00 ba
+[t= 420] REACTOR   # 7  gps 2.00 ba -> 20.00 bi  nextCost=2.10 Qa
+[t= 480] REACTOR   # 8  gps 20.00 bi -> 200.00 bq  nextCost=16.78 Qa
+[t= 480] PRESTIGE  gps 200.00 bq -> 2.00 bs
+[t= 480] SNAPSHOT  gold=   149.43 bj  gps=     2.00 bs
+[t= 540] REACTOR   # 9  gps 2.00 bs -> 20.00 ca  nextCost=134.22 Qa
+[t= 600] REACTOR   #10  gps 20.00 ca -> 200.00 ci  nextCost=1.07 Qi
+[t= 600] SNAPSHOT  gold=   149.43 cb  gps=   200.00 ci
+[t= 660] REACTOR   #11  gps 200.00 ci -> 2.00 cr  nextCost=8.59 Qi
+[t= 720] REACTOR   #12  gps 2.00 cr -> 20.00 cz  nextCost=68.72 Qi
+[t= 720] SNAPSHOT  gold=    14.94 cs  gps=    20.00 cz
+
+=== Final scale check ===
+reactors bought: 12
+final gold (unit+letter): 14.94 cs
+final gps  (unit+letter): 20.00 cz
+final gold as JS Number: 1.494328222485101e+292
+final gps as JS Number : Infinity
+If JS shows Infinity while unit+letter output stays finite, the library is doing its job.
 ```
 
 ## Performance
