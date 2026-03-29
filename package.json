@@ -1,6 +1,6 @@
 {
   "name": "arbitrary-numbers",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Arbitrary-magnitude arithmetic for idle games and simulations, with fused operations, formula pipelines, and pluggable number formatting.",
   "author": "Chris",
   "license": "MIT",
