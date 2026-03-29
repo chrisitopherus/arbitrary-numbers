@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.2] - 2026-03-29
 
-### Changed
-
-- fixed readme examples in readme
-
 ### Fixed
 
 - README/example drift: corrected mismatches where README snippets and output no longer matched the scripts in `examples/`
