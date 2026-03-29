@@ -1,7 +1,7 @@
 {
   "name": "arbitrary-numbers",
   "version": "1.0.0",
-  "description": "Immutable arbitrary-magnitude numbers for idle games, simulations, and scientific computing. Stored as coefficient × 10^exponent with pluggable display formatting.",
+  "description": "Arbitrary-magnitude arithmetic for idle games and simulations, with fused ops, formula pipelines, and pluggable number formatting.",
   "author": "Chris",
   "license": "MIT",
   "repository": {

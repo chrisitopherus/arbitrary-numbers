@@ -10,7 +10,15 @@
   [![Zero dependencies](https://img.shields.io/badge/dependencies-zero-6366f1?labelColor=0c0c0e)](package.json)
 </div>
 
-`arbitrary-numbers` is a TypeScript library for numbers beyond `Number.MAX_SAFE_INTEGER`. Exact arithmetic at any scale, with fused operations and formula pipelines built for idle game loops and simulations.
+`arbitrary-numbers` fills a specific gap: JavaScript's `Number` type silently loses precision above `Number.MAX_SAFE_INTEGER`, and `BigInt` doesn't support decimals or fast arithmetic over huge exponents.
+
+Numbers are stored as a normalized `coefficient × 10^exponent` pair. That makes arithmetic across wildly different scales fast and predictable — exactly what idle games and simulations need when values span from `1` to `10^300` in the same loop.
+
+- **Immutable by default** — every operation returns a new instance, no surprise mutations
+- **Fused operations** (`mulAdd`, `subMul`, ...) — reduce allocations in hot loops
+- **Formula pipelines** — define an expression once, apply it to any number of values
+- **Pluggable display** — swap between scientific, unit (K/M/B/T), and letter notation without touching game logic
+- **Zero dependencies** — nothing to audit, nothing to break
 
 ## Install
 
@@ -54,17 +62,27 @@ an(1.5, 9).toString(unitNotation)  // "1.50 B"
 
 ## Table of contents
 
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Table of contents](#table-of-contents)
 - [Creating numbers](#creating-numbers)
 - [Arithmetic](#arithmetic)
 - [Fused operations](#fused-operations)
-- [Fluent builder - chain()](#fluent-builder---chain)
-- [Reusable formulas - formula()](#reusable-formulas---formula)
+- [Fluent builder - `chain()`](#fluent-builder---chain)
+- [Reusable formulas - `formula()`](#reusable-formulas---formula)
+  - [chain() vs formula()](#chain-vs-formula)
 - [Comparison and predicates](#comparison-and-predicates)
 - [Rounding and math](#rounding-and-math)
 - [Display and formatting](#display-and-formatting)
+  - [scientificNotation (default)](#scientificnotation-default)
+  - [unitNotation - K, M, B, T...](#unitnotation---k-m-b-t)
+  - [AlphabetNotation - a, b, c... aa, ab...](#alphabetnotation---a-b-c-aa-ab)
 - [Precision control](#precision-control)
 - [Errors](#errors)
 - [Utilities](#utilities)
+  - [ArbitraryNumberOps - mixed `number | ArbitraryNumber` input](#arbitrarynumberops---mixed-number--arbitrarynumber-input)
+  - [ArbitraryNumberGuard - type guards](#arbitrarynumberguard---type-guards)
+  - [ArbitraryNumberHelpers - game and simulation patterns](#arbitrarynumberhelpers---game-and-simulation-patterns)
 - [Writing a custom plugin](#writing-a-custom-plugin)
 - [Idle game example](#idle-game-example)
 - [Performance](#performance)
