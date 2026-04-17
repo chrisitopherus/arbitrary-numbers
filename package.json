@@ -15,11 +15,18 @@
   "keywords": [
     "arbitrary-numbers",
     "big-number",
+    "bignumber",
     "large-number",
     "scientific-notation",
     "idle-game",
+    "idle-games",
     "incremental-game",
+    "incremental",
+    "clicker",
+    "prestige",
     "game-math",
+    "notation",
+    "decimal",
     "typescript"
   ],
   "type": "module",

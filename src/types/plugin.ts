@@ -146,4 +146,18 @@ export interface UnitNotationOptions extends SuffixNotationPluginOptions {
      * @default undefined
      */
     fallback?: SuffixProvider;
+    /**
+     * When `true` (default), the fallback's tier is offset by the last defined tier in `units`
+     * so that fallback suffixes are visually distinct from those the fallback would generate
+     * for low tiers.
+     *
+     * Example with `CLASSIC_UNITS` (last defined tier = 33) and `letterNotation` as fallback:
+     * - `offsetFallback: true`  → exponent 102 (tier 34) → `"a"` (fallback tier 1, distinct from "K")
+     * - `offsetFallback: false` → exponent 102 (tier 34) → `"h"` (fallback tier 34, same as exponent 24)
+     *
+     * Set to `false` only for backwards compatibility with pre-1.1 behaviour.
+     *
+     * @default true
+     */
+    offsetFallback?: boolean;
 }

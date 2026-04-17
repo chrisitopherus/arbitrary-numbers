@@ -75,10 +75,26 @@ describe("ScientificNotation", () => {
             expect(sn.format(1.5, 15, 2)).toBe("1.50e+15");
         });
 
-        it("coefficient value that would need rounding at 0 decimals", () => {
+        it("coefficient rounds up to 10 at 0 decimals — re-normalises exponent", () => {
             const sn = new ScientificNotation();
-            // 9.999... rounds to 10.000 at 0 decimals — toFixed handles this
-            expect(sn.format(9.5, 3, 0)).toBe("10e+3");
+            // 9.5 rounds to 10 at 0 decimals; output must re-normalise to 1e+4 not "10e+3"
+            expect(sn.format(9.5, 3, 0)).toBe("1e+4");
+        });
+
+        it("coefficient rounds up to 10 at 1 decimal — re-normalises exponent", () => {
+            const sn = new ScientificNotation();
+            // 9.99 rounds to 10.0 at 1 decimal
+            expect(sn.format(9.99, 3, 1)).toBe("1.0e+4");
+        });
+
+        it("coefficient rounds up to 10 with zero exponent — re-normalises to e+1", () => {
+            const sn = new ScientificNotation();
+            expect(sn.format(9.5, 0, 0)).toBe("1e+1");
+        });
+
+        it("negative coefficient rounds past -10 — re-normalises exponent", () => {
+            const sn = new ScientificNotation();
+            expect(sn.format(-9.5, 3, 0)).toBe("-1e+4");
         });
     });
 
