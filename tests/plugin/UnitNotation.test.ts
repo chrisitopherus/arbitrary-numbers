@@ -41,9 +41,15 @@ describe("UnitNotation", () => {
             expect(n.format(1.5, 33, 2)).toBe("1.50");
         });
 
-        it("respects a custom fallback plugin", () => {
+        it("respects a custom fallback plugin (offsetFallback=true by default)", () => {
             const n = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
-            // tier 11, no unit → letterNotation.getSuffix(11) = 'k', separator = " " (default)
+            // tier 11, no unit → offsetFallback: fallbackTier = 11 - 10 = 1 → "a", separator = " "
+            expect(n.format(1.5, 33, 2)).toBe("1.50 a");
+        });
+
+        it("offsetFallback=false passes raw tier to fallback", () => {
+            const n = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation, offsetFallback: false });
+            // tier 11 → letterNotation.getSuffix(11) = 'k', separator = " "
             expect(n.format(1.5, 33, 2)).toBe("1.50 k");
         });
     });
@@ -136,18 +142,27 @@ describe("UnitNotation", () => {
             expect(n.format(1.5, 36, 2)).toBe("1.50");
         });
 
-        it("uses fallback getSuffix, keeping own separator", () => {
+        it("uses fallback getSuffix with offset, keeping own separator", () => {
             const n = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
-            // tier 11 → letterNotation.getSuffix(11) = 'k', default separator = " "
-            expect(n.format(1.5, 33, 2)).toBe("1.50 k");
+            // tier 11, COMPACT_UNITS last=10 → fallbackTier = 1 → "a", separator = " "
+            expect(n.format(1.5, 33, 2)).toBe("1.50 a");
         });
 
-        it("delegates tier (not exponent) to fallback getSuffix", () => {
+        it("delegates offset tier to fallback getSuffix", () => {
             const captured: number[] = [];
             const spy = { getSuffix: (tier: number) => { captured.push(tier); return ""; } };
             const n = new UnitNotation({ units: COMPACT_UNITS, fallback: spy });
             n.format(1.5, 99, 2);
-            expect(captured[0]).toBe(33); // tier = floor(99 / 3) = 33
+            // tier = floor(99/3) = 33; COMPACT_UNITS lastDefinedTier = 10; fallbackTier = 23
+            expect(captured[0]).toBe(23);
+        });
+
+        it("offsetFallback=false delegates raw tier to fallback getSuffix", () => {
+            const captured: number[] = [];
+            const spy = { getSuffix: (tier: number) => { captured.push(tier); return ""; } };
+            const n = new UnitNotation({ units: COMPACT_UNITS, fallback: spy, offsetFallback: false });
+            n.format(1.5, 99, 2);
+            expect(captured[0]).toBe(33); // raw tier = floor(99/3) = 33
         });
     });
 
@@ -166,8 +181,15 @@ describe("UnitNotation", () => {
             expect(n.getSuffix(50)).toBe("");
         });
 
-        it("returns fallback suffix when no unit matches", () => {
+        it("returns fallback suffix when no unit matches (offset applied)", () => {
             const n = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
+            // tier 50, lastDefinedTier=10 → fallbackTier = 40
+            // alphabetSuffix(40): index=39, first 26 single (1-26), offset=26, remaining=13 → 'an'
+            expect(n.getSuffix(50)).toBe("an");
+        });
+
+        it("returns fallback suffix without offset when offsetFallback=false", () => {
+            const n = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation, offsetFallback: false });
             // tier 50 → letterNotation index 49 → two-letter: 49-26=23, first='a', second='x' → 'ax'
             expect(n.getSuffix(50)).toBe("ax");
         });
@@ -190,10 +212,21 @@ describe("UnitNotation", () => {
         });
 
         it("falls back to letterNotation for exponents beyond Ct+2 (exponent 306)", () => {
-            // tier = floor(306/3) = 102, no unit → letterNotation.getSuffix(102)
-            // index = 101 → two-letter: 75, first='c', second='x' → 'cx'
-            // own separator " " is used → "1.50 cx"
-            expect(unitNotation.format(1.5, 306, 2)).toBe("1.50 cx");
+            // tier = floor(306/3) = 102, CLASSIC_UNITS lastDefinedTier=101 (Ct)
+            // fallbackTier = 102 - 101 = 1 → "a", separator " "
+            expect(unitNotation.format(1.5, 306, 2)).toBe("1.50 a");
+        });
+
+        it("falls back with correct offset for exponent 309 (two tiers past Ct)", () => {
+            // tier = floor(309/3) = 103, fallbackTier = 103 - 101 = 2 → "b"
+            expect(unitNotation.format(1.5, 309, 2)).toBe("1.50 b");
+        });
+
+        it("unitNotation exponent 306 is visually distinct from exponent 3", () => {
+            // Key correctness test: these must NOT produce the same output
+            const beyondCt = unitNotation.format(1.5, 306, 2);
+            const thousand = unitNotation.format(1.5, 3, 2);
+            expect(beyondCt).not.toBe(thousand);
         });
 
         it("Ct (exponent 303) is the last matching unit", () => {

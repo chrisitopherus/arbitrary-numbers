@@ -1,5 +1,6 @@
 import { type Mod3 } from "../types/core";
 import { type SuffixNotationPlugin, type SuffixNotationPluginOptions } from "../types/plugin";
+import { pow10 } from "../constants/pow10";
 
 /**
  * Abstract base class for suffix-based notation plugins (e.g. `"1.50 K"`, `"3.20a"`).
@@ -50,7 +51,8 @@ export abstract class SuffixNotationBase implements SuffixNotationPlugin {
      */
     public format(coefficient: number, exponent: number, decimals: number): string {
         if (exponent < 0) {
-            return (coefficient * Math.pow(10, exponent)).toFixed(decimals);
+            // Use pow10 table for |exponent| in [1,15]; Math.pow fallback for larger negatives.
+            return (coefficient / pow10(-exponent)).toFixed(decimals);
         }
 
         const tier = Math.floor(exponent / 3);

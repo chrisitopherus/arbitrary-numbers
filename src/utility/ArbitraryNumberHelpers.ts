@@ -78,6 +78,7 @@ export class ArbitraryNumberHelpers {
         const numDelta = ArbitraryNumberHelpers.coerce(delta);
         const numFloor = ArbitraryNumberHelpers.coerce(floor);
 
-        return ArbitraryNumber.clamp(numValue.sub(numDelta), numFloor, numValue);
+        const result = numValue.sub(numDelta);
+        return result.lessThan(numFloor) ? numFloor : result;
     }
 }
