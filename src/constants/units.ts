@@ -1,4 +1,5 @@
 import { type Unit, type UnitArray } from "../types/plugin";
+import { type Maybe } from "../types/utility";
 
 /**
  * Full tier-indexed unit list from Thousand (tier 1, 10^3) to Centillion (tier 101, 10^303).
@@ -13,7 +14,7 @@ import { type Unit, type UnitArray } from "../types/plugin";
  * notation.format(1.5, 6, 2);  // "1.50 M"
  */
 export const CLASSIC_UNITS: UnitArray = (() => {
-    const u: Array<Unit | undefined> = [
+    const u: Array<Maybe<Unit>> = [
         undefined,                                         // tier  0: exponent  0-2  (no unit)
         { symbol: "K",    name: "Thousand" },             // tier  1: exponent  3
         { symbol: "M",    name: "Million" },              // tier  2: exponent  6

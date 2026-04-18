@@ -1,4 +1,5 @@
 import { ArbitraryNumber } from "./ArbitraryNumber";
+import { type Maybe } from "../types/utility";
 
 type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
 
@@ -34,19 +35,19 @@ type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
  * const result    = full.apply(baseDamage);
  */
 export class AnFormula {
-    private readonly _name?: string;
+    private readonly _name: Maybe<string>;
     private readonly steps: ReadonlyArray<FormulaStep>;
 
     /**
      * Prefer the {@link formula} factory function over calling this directly.
      */
-    public constructor(name?: string, steps: ReadonlyArray<FormulaStep> = []) {
+    public constructor(name?: Maybe<string>, steps: ReadonlyArray<FormulaStep> = []) {
         this._name = name;
         this.steps = steps;
     }
 
     /** The name passed to {@link formula}, if any. */
-    public get name(): string | undefined {
+    public get name(): Maybe<string> {
         return this._name;
     }
 
@@ -178,6 +179,6 @@ export class AnFormula {
  * const full   = armorReduction.then(critBonus);
  * const result = full.apply(baseDamage);
  */
-export function formula(name?: string): AnFormula {
+export function formula(name?: Maybe<string>): AnFormula {
     return new AnFormula(name, []);
 }

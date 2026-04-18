@@ -1,5 +1,5 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-import type { ArbitraryNumberish } from "../types/utility";
+import type { ArbitraryNumberish, Nullable } from "../types/utility";
 
 /**
  * Convenience helpers for mixed `number | ArbitraryNumber` inputs.
@@ -23,9 +23,32 @@ export class ArbitraryNumberOps {
      *
      * @param value - A plain `number` or an existing `ArbitraryNumber`.
      * @returns The corresponding `ArbitraryNumber`.
+     * @throws `ArbitraryNumberInputError` when `value` is `NaN`, `Infinity`, or `-Infinity`.
      */
     public static from(value: ArbitraryNumberish): ArbitraryNumber {
         return value instanceof ArbitraryNumber ? value : ArbitraryNumber.from(value);
+    }
+
+    /**
+     * Converts `value` to an `ArbitraryNumber`, returning `null` for non-finite inputs
+     * instead of throwing.
+     *
+     * Use this at system boundaries (form inputs, external APIs) where you want to handle
+     * bad input gracefully rather than catching an exception.
+     *
+     * @param value - A plain `number` or an existing `ArbitraryNumber`.
+     * @returns The `ArbitraryNumber`, or `null` if the input is `NaN`, `Infinity`, or `-Infinity`.
+     *
+     * @example
+     * ops.tryFrom(1500)      // ArbitraryNumber { coefficient: 1.5, exponent: 3 }
+     * ops.tryFrom(Infinity)  // null
+     * ops.tryFrom(NaN)       // null
+     */
+    public static tryFrom(value: ArbitraryNumberish): Nullable<ArbitraryNumber> {
+        if (value instanceof ArbitraryNumber) return value;
+        if (!isFinite(value)) return null;
+
+        return ArbitraryNumber.from(value);
     }
 
     /**

@@ -434,6 +434,43 @@ describe("ArbitraryNumber", () => {
         it("ceil of a negative fraction (−0.5) = 0", () => {
             expect(raw(-5, -1).ceil().equals(ArbitraryNumber.Zero)).toBe(true);
         });
+
+        it("floor of small positive fraction (exponent <= -2) = 0", () => {
+            expect(raw(9.9, -2).floor().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(raw(1.0, -5).floor().equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("floor of small negative fraction (exponent <= -2) = -1", () => {
+            expect(raw(-9.9, -2).floor().equals(raw(-1, 0))).toBe(true);
+            expect(raw(-1.0, -5).floor().equals(raw(-1, 0))).toBe(true);
+        });
+
+        it("ceil of small positive fraction (exponent <= -2) = 1", () => {
+            expect(raw(9.9, -2).ceil().equals(ArbitraryNumber.One)).toBe(true);
+            expect(raw(1.0, -5).ceil().equals(ArbitraryNumber.One)).toBe(true);
+        });
+
+        it("ceil of small negative fraction (exponent <= -2) = 0", () => {
+            expect(raw(-9.9, -2).ceil().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(raw(-1.0, -5).ceil().equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("floor/ceil of zero = zero", () => {
+            expect(ArbitraryNumber.Zero.floor().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(ArbitraryNumber.Zero.ceil().equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("round of small fraction (exponent <= -2) = 0", () => {
+            expect(raw(9.9, -2).round().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(raw(-9.9, -2).round().equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("round result is never signed zero", () => {
+            // raw(-4.9, -1) = -0.49 — Math.round(-0.49) = -0, constructor must normalise to +0
+            const result = raw(-4.9, -1).round();
+            expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(Object.is(result.coefficient, -0)).toBe(false);
+        });
     });
 
     // -----------------------------------------------------------------------
