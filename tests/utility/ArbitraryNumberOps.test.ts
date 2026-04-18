@@ -19,4 +19,41 @@ describe("ArbitraryNumberOps", () => {
     it("clamp works with mixed inputs", () => {
         expect(ArbitraryNumberOps.clamp(1500, 1000, 2000).equals(ArbitraryNumber.from(1500))).toBe(true);
     });
+
+    describe("tryFrom", () => {
+        it("converts a plain number", () => {
+            const result = ArbitraryNumberOps.tryFrom(1500);
+            expect(result).not.toBeNull();
+            expect(result!.equals(ArbitraryNumber.from(1500))).toBe(true);
+        });
+
+        it("returns the ArbitraryNumber unchanged", () => {
+            const n = ArbitraryNumber.from(1500);
+            expect(ArbitraryNumberOps.tryFrom(n)).toBe(n);
+        });
+
+        it("returns null for Infinity", () => {
+            expect(ArbitraryNumberOps.tryFrom(Infinity)).toBeNull();
+        });
+
+        it("returns null for -Infinity", () => {
+            expect(ArbitraryNumberOps.tryFrom(-Infinity)).toBeNull();
+        });
+
+        it("returns null for NaN", () => {
+            expect(ArbitraryNumberOps.tryFrom(NaN)).toBeNull();
+        });
+
+        it("returns Zero for 0", () => {
+            const result = ArbitraryNumberOps.tryFrom(0);
+            expect(result).not.toBeNull();
+            expect(result!.equals(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("handles negative numbers", () => {
+            const result = ArbitraryNumberOps.tryFrom(-1500);
+            expect(result).not.toBeNull();
+            expect(result!.equals(ArbitraryNumber.from(-1500))).toBe(true);
+        });
+    });
 });

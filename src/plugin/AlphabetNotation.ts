@@ -38,6 +38,11 @@ export function alphabetSuffix(tier: number, alphabet = "abcdefghijklmnopqrstuvw
     if (alphabet.length === 0) throw new ArbitraryNumberInputError("alphabet must not be empty", alphabet);
     if (tier <= 0) return "";
 
+    // Single-character alphabet: the only suffix is that character repeated `tier` times.
+    // Without this guard the while loop below would run O(tier) times (capacity never grows
+    // past 1^length = 1), causing a hang for large tiers like 1e6.
+    if (alphabet.length === 1) return alphabet.repeat(tier);
+
     const index = tier - 1; // tier 1 = first symbol = index 0
 
     // Find which length group this index falls in.

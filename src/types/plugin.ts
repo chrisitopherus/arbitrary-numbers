@@ -1,3 +1,5 @@
+import type { Maybe } from "./utility";
+
 /**
  * A plugin that formats a normalised scientific notation number into a display string.
  *
@@ -64,7 +66,7 @@ export interface SuffixNotationPluginOptions {
      *
      * @example " " -> "1.50 K"  |  "" -> "1.50K"
      */
-    separator?: string;
+    separator?: Maybe<string>;
 }
 
 /**
@@ -82,7 +84,7 @@ export interface Unit {
     /** Short symbol displayed after the number, e.g. `"M"`. */
     symbol: string;
     /** Optional full name, e.g. `"Million"`. Used for display purposes only. */
-    name?: string;
+    name?: Maybe<string>;
 }
 
 /**
@@ -101,7 +103,7 @@ export interface Unit {
  *   { symbol: "M" },   // tier 2: millions
  * ];
  */
-export type UnitArray = ReadonlyArray<Unit | undefined>;
+export type UnitArray = ReadonlyArray<Maybe<Unit>>;
 
 /**
  * Options for constructing an {@link AlphabetNotation} instance.
@@ -116,7 +118,7 @@ export interface AlphabetNotationOptions extends SuffixNotationPluginOptions {
      *
      * @default `"abcdefghijklmnopqrstuvwxyz"`
      */
-    alphabet?: string;
+    alphabet?: Maybe<string>;
 }
 
 /**
@@ -145,7 +147,7 @@ export interface UnitNotationOptions extends SuffixNotationPluginOptions {
      *
      * @default undefined
      */
-    fallback?: SuffixProvider;
+    fallback?: Maybe<SuffixProvider>;
     /**
      * When `true` (default), the fallback's tier is offset by the last defined tier in `units`
      * so that fallback suffixes are visually distinct from those the fallback would generate
@@ -159,5 +161,5 @@ export interface UnitNotationOptions extends SuffixNotationPluginOptions {
      *
      * @default true
      */
-    offsetFallback?: boolean;
+    offsetFallback?: Maybe<boolean>;
 }

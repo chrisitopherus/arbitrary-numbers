@@ -27,6 +27,6 @@ export { ArbitraryNumberGuard as guard } from "./utility/ArbitraryNumberGuard";
 export { ArbitraryNumberHelpers as helpers } from "./utility/ArbitraryNumberHelpers";
 
 // Types
-export type { ArbitraryNumberish } from "./types/utility";
+export type { ArbitraryNumberish, Maybe, Nullable, ArbitraryNumberJson } from "./types/utility";
 export type { AnFunction, NormalizedNumber, Signum, Mod3 } from "./types/core";
 export type { NotationPlugin, SuffixProvider, SuffixNotationPlugin, SuffixNotationPluginOptions, AlphabetNotationOptions, Unit, UnitArray, UnitNotationOptions } from "./types/plugin";
