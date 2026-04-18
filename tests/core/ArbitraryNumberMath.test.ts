@@ -19,7 +19,7 @@ function approxEqual(a: ArbitraryNumber, b: ArbitraryNumber, tol = 1e-9): boolea
 
 describe("cbrt — cube root", () => {
     it("cbrt(0) = 0", () => {
-        expect(ArbitraryNumber.Zero.cbrt().equals(ArbitraryNumber.Zero)).toBe(true);
+        expect(num(0).cbrt().equals(ArbitraryNumber.Zero)).toBe(true);
     });
 
     it("cbrt(1) = 1", () => {
@@ -244,7 +244,7 @@ describe("exp10 — 10^n", () => {
 
 describe("trunc — truncate toward zero", () => {
     it("trunc(0) = 0", () => {
-        expect(ArbitraryNumber.Zero.trunc().equals(ArbitraryNumber.Zero)).toBe(true);
+        expect(num(0).trunc().equals(ArbitraryNumber.Zero)).toBe(true);
     });
 
     it("trunc(1.7) = 1", () => {
@@ -260,8 +260,7 @@ describe("trunc — truncate toward zero", () => {
     });
 
     it("trunc(-1.7) ≠ floor(-1.7)", () => {
-        const n = num(-1.7);
-        expect(n.trunc().equals(n.floor())).toBe(false);
+        expect(num(-1.7).trunc().equals(num(-1.7).floor())).toBe(false);
     });
 
     it("trunc(1.9) = 1", () => {

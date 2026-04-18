@@ -1,29 +1,21 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
 import type { ArbitraryNumberish } from "../types/utility";
-import { ArbitraryNumberOps } from "./ArbitraryNumberOps";
 import { ArbitraryNumberInputError } from "../errors";
 
 /**
  * Domain-level helpers for common game and simulation patterns.
  *
- * These sit above the core arithmetic layer - each method accepts
- * mixed input (`number | ArbitraryNumber`) via
- * {@link ArbitraryNumberOps.from} so they work at system boundaries
- * where you may receive raw numbers.
- *
+ * Accepts mixed input (`number | ArbitraryNumber`) via `ArbitraryNumber.from`.
  * For hot-path code, use `ArbitraryNumber` methods directly.
  */
 export class ArbitraryNumberHelpers {
     private static coerce(value: ArbitraryNumberish): ArbitraryNumber {
-        return ArbitraryNumberOps.from(value);
+        return value instanceof ArbitraryNumber ? value : ArbitraryNumber.from(value);
     }
 
     /**
      * Returns `true` when `value >= threshold`.
      *
-     * @param value - The value to test.
-     * @param threshold - The minimum required value.
-     * @returns `true` when `value >= threshold`.
      * @example
      * ArbitraryNumberHelpers.meetsOrExceeds(gold, upgradeCost)
      */
@@ -37,9 +29,6 @@ export class ArbitraryNumberHelpers {
      *
      * Equivalent to `floor(total / step)`.
      *
-     * @param total - The total available amount.
-     * @param step - The cost or size of one unit. Must be greater than zero.
-     * @returns The number of whole units that fit, as an `ArbitraryNumber`.
      * @throws `"step must be greater than zero"` when `step <= 0`.
      * @example
      * const canBuy = ArbitraryNumberHelpers.wholeMultipleCount(gold, upgradeCost);
@@ -56,16 +45,12 @@ export class ArbitraryNumberHelpers {
             return ArbitraryNumber.Zero;
         }
 
-        return numTotal.div(numStep).floor();
+        return numTotal.clone().div(numStep).floor();
     }
 
     /**
      * Returns `value - delta`, clamped to a minimum of `floor` (default `0`).
      *
-     * @param value - The starting value.
-     * @param delta - The amount to subtract.
-     * @param floor - The minimum result. Defaults to `ArbitraryNumber.Zero`.
-     * @returns `max(value - delta, floor)`.
      * @example
      * health = ArbitraryNumberHelpers.subtractWithFloor(health, damage);
      */
@@ -78,7 +63,7 @@ export class ArbitraryNumberHelpers {
         const numDelta = ArbitraryNumberHelpers.coerce(delta);
         const numFloor = ArbitraryNumberHelpers.coerce(floor);
 
-        const result = numValue.sub(numDelta);
+        const result = numValue.clone().sub(numDelta);
         return result.lessThan(numFloor) ? numFloor : result;
     }
 }

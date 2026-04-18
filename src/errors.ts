@@ -55,3 +55,20 @@ export class ArbitraryNumberDomainError extends ArbitraryNumberError {
         this.context = context;
     }
 }
+
+/**
+ * Thrown when a mutating method is called on a frozen `ArbitraryNumber`.
+ *
+ * @example
+ * try {
+ *     frozen.add(other);
+ * } catch (e) {
+ *     if (e instanceof ArbitraryNumberMutationError) { ... }
+ * }
+ */
+export class ArbitraryNumberMutationError extends ArbitraryNumberDomainError {
+    public constructor(message: string) {
+        super(message, {});
+        this.name = "ArbitraryNumberMutationError";
+    }
+}

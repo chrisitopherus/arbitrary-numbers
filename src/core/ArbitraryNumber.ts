@@ -1,86 +1,83 @@
 import { scientificNotation } from "../plugin/ScientificNotation";
-import { type NormalizedNumber, type Signum } from "../types/core";
+import { type Signum } from "../types/core";
 import { type NotationPlugin } from "../types/plugin";
-import { type ArbitraryNumberJson } from "../types/utility";
-import { pow10, pow10Int } from "../constants/pow10";
+import { type ArbitraryNumberJson, type Nullable } from "../types/utility";
+import { pow10 } from "../constants/pow10";
 import { ArbitraryNumberInputError, ArbitraryNumberDomainError } from "../errors";
 
 /**
- * An immutable number with effectively unlimited range, stored as `coefficient * 10^exponent`
- * in normalised scientific notation.
+ * Global tunables for `ArbitraryNumber`.
  *
- * The coefficient is always in `[1, 10)` (or `0`). Addition short-circuits when the exponent
- * difference between operands exceeds {@link PrecisionCutoff} - the smaller value is below
- * the precision floor of the larger and is silently discarded.
- *
- * @example
- * const a = new ArbitraryNumber(1.5, 3);  // 1,500
- * const b = new ArbitraryNumber(2.5, 3);  // 2,500
- * a.add(b).toString(); // "4.00e+3"
- * a.mul(b).toString(); // "3.75e+6"
+ * Mutating these is a process-level change — not per-instance.
  */
-export class ArbitraryNumber implements NormalizedNumber {
-    /** The significand, always in `[1, 10)` or `0`. */
-    public readonly coefficient: number;
-    /** The power of 10 by which the coefficient is scaled. */
-    public readonly exponent: number;
-
+export interface ArbitraryNumberDefaults {
     /**
-     * Precision cutoff: exponent-difference threshold below which the smaller operand
-     * is negligible and silently skipped during addition/subtraction.
-     *
-     * When |exponent_diff| > PrecisionCutoff, the smaller operand contributes less than
-     * 10^-PrecisionCutoff of the result - below float64 coefficient precision for the default of 15.
+     * Exponent-difference threshold below which the smaller operand is negligible
+     * and silently skipped during addition/subtraction.
      *
      * Default: 15 (matches float64 coefficient precision of ~15.95 significant digits).
-     * Game patterns: diffs 0-8 (exact), prestige 15-25 (loss <0.0001%), idle 20-50 (~0.1% loss).
-     *
-     * Override globally via assignment, or use {@link withPrecision} for a scoped block.
      */
-    public static PrecisionCutoff: number = 15;
+    scaleCutoff: number;
+    /** Default decimal places used by `toString()` when no argument is supplied. */
+    notationDecimals: number;
+}
 
-    /** The additive identity: `0`. */
-    public static readonly Zero = new ArbitraryNumber(0, 0);
-    /** The multiplicative identity: `1`. */
-    public static readonly One = new ArbitraryNumber(1, 0);
-    /** `10`. */
-    public static readonly Ten = new ArbitraryNumber(1, 1);
+/**
+ * A mutable number with effectively unlimited range, stored as `coefficient * 10^exponent`
+ * in normalised scientific notation.
+ *
+ * The coefficient is always in `[1, 10)` (or `0`). Arithmetic methods **mutate `this`** and
+ * return `this` — enabling zero-allocation chaining on the hot path:
+ *
+ * ```ts
+ * gold.add(drop).sub(cost).mul(multiplier);
+ * ```
+ *
+ * Call `.clone()` before any operation where you need to preserve the original value.
+ *
+ * Addition short-circuits when the exponent difference between operands exceeds
+ * {@link ArbitraryNumber.defaults.scaleCutoff} — the smaller value is below the precision
+ * floor and is silently discarded.
+ *
+ * **Static = allocate. Instance = mutate.**
+ * Static arithmetic methods (`ArbitraryNumber.add`, etc.) always return a new instance.
+ * Instance methods (`a.add(b)`) mutate `a` and return `a`.
+ *
+ * @example
+ * const gold = new ArbitraryNumber(1.5, 3);  // 1_500
+ * gold.add(drop).sub(cost).mul(multiplier);  // mutates gold
+ * const snapshot = gold.clone();             // safe copy
+ */
+export class ArbitraryNumber {
+    /** The significand, always in `[1, 10)` or `0`. */
+    public coefficient: number;
+    /** The power of 10 by which the coefficient is scaled. */
+    public exponent: number;
 
-    /**
-     * Creates an `ArbitraryNumber` from a plain JavaScript `number`.
-     *
-     * Prefer this over `new ArbitraryNumber(value, 0)` when working with
-     * ordinary numeric literals - it reads clearly at the call site and
-     * validates the input.
-     *
-     * @example
-     * ArbitraryNumber.from(1500);   // { coefficient: 1.5, exponent: 3 }
-     * ArbitraryNumber.from(0.005);  // { coefficient: 5,   exponent: -3 }
-     * ArbitraryNumber.from(0);      // ArbitraryNumber.Zero
-     * ArbitraryNumber.from(-0);     // ArbitraryNumber.Zero  (signed zero is normalised to +0)
-     *
-     * @param value - Any finite number. Signed zero (`-0`) is treated as `0`.
-     * @throws `"ArbitraryNumber.from: value must be finite"` for `NaN`, `Infinity`, or `-Infinity`.
-     */
-    public static from(value: number): ArbitraryNumber {
-        if (!isFinite(value)) {
-            throw new ArbitraryNumberInputError("ArbitraryNumber.from: value must be finite", value);
-        }
+    /** Global tunables. Mutating these is a process-level change. */
+    public static readonly defaults: ArbitraryNumberDefaults = {
+        scaleCutoff: 15,
+        notationDecimals: 2,
+    };
 
-        return new ArbitraryNumber(value, 0);
-    }
+    /** The additive identity: `0`. Frozen — calling mutating methods throws. */
+    public static readonly Zero: FrozenArbitraryNumber = new ArbitraryNumber(0, 0) as unknown as FrozenArbitraryNumber;
+    /** The multiplicative identity: `1`. Frozen — calling mutating methods throws. */
+    public static readonly One: FrozenArbitraryNumber = new ArbitraryNumber(1, 0) as unknown as FrozenArbitraryNumber;
+    /** `10`. Frozen — calling mutating methods throws. */
+    public static readonly Ten: FrozenArbitraryNumber = new ArbitraryNumber(1, 1) as unknown as FrozenArbitraryNumber;
 
     /**
      * Constructs a new `ArbitraryNumber` and immediately normalises it so that
      * `1 <= |coefficient| < 10` (or `coefficient === 0`).
      *
+     * Always two numeric arguments — this keeps the constructor monomorphic so V8
+     * locks in a hidden class on first use (~5 ns allocation).
+     *
      * @example
      * new ArbitraryNumber(15, 3); // stored as { coefficient: 1.5, exponent: 4 }
      *
-     * @param coefficient - The significand. Must be a finite number; will be normalised.
-     * @param exponent - The power of 10. Must be a finite number.
-     * @throws `"ArbitraryNumber: coefficient must be finite"` for `NaN`, `Infinity`, or `-Infinity`.
-     * @throws `"ArbitraryNumber: exponent must be finite"` for non-finite exponents.
+     * @throws `ArbitraryNumberInputError` for `NaN`/`Infinity` coefficient or exponent.
      */
     public constructor(coefficient: number, exponent: number) {
         if (coefficient === 0) {
@@ -109,24 +106,21 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * @internal Fast-path factory for already-normalised values.
+     * @internal Fast-path factory for already-normalised values. Not exported from `index.ts`.
      *
-     * Uses Object.create() to bypass the constructor (zero normalisation cost).
-     * Only valid when |coefficient| is already in [1, 10) and exponent is correct.
-     * Do NOT use for unnormalised inputs - call new ArbitraryNumber(c, e) instead.
+     * Allocates a new instance and writes the two fields directly — bypasses validation
+     * and normalisation. Only valid when `|coefficient|` is already in `[1, 10)` (or 0)
+     * and `exponent` is correct.
      */
-    private static createNormalized(coefficient: number, exponent: number): ArbitraryNumber {
-        if (typeof process !== "undefined" && process.env["NODE_ENV"] !== "production" && coefficient === 0 && exponent !== 0) {
-            console.warn(`ArbitraryNumber.createNormalized: zero coefficient with non-zero exponent (${exponent}). Use ArbitraryNumber.Zero instead.`);
-        }
-
-        const n = Object.create(ArbitraryNumber.prototype);
+    public static unsafe(coefficient: number, exponent: number): ArbitraryNumber {
+        const n = new ArbitraryNumber(0, 0);
         n.coefficient = coefficient;
         n.exponent = exponent;
-        return n as ArbitraryNumber;
+        return n;
     }
 
-    private static normalizeFrom(c: number, e: number): ArbitraryNumber {
+    /** @internal Normalise an arbitrary `(c, e)` pair into a new instance. */
+    private static _normalizeNew(c: number, e: number): ArbitraryNumber {
         if (c === 0) return ArbitraryNumber.Zero;
 
         const abs = Math.abs(c);
@@ -134,150 +128,291 @@ export class ArbitraryNumber implements NormalizedNumber {
         const scale = pow10(shift);
         if (scale === 0) return ArbitraryNumber.Zero;
 
-        return ArbitraryNumber.createNormalized(c / scale, e + shift);
+        return ArbitraryNumber.unsafe(c / scale, e + shift);
+    }
+
+    /** @internal Normalise `(c, e)` into `this` (mutates). Returns `this`. */
+    private _normalizeInto(c: number, e: number): this {
+        if (c === 0) { this.coefficient = 0; this.exponent = 0; return this; }
+        const abs = c < 0 ? -c : c;
+        // Fast path: after add/sub the result is almost always in [0.1, 100).
+        if (abs < 10) {
+            if (abs >= 1) { this.coefficient = c; this.exponent = e; return this; }
+            this.coefficient = c * 10; this.exponent = e - 1; return this;
+        }
+        if (abs < 100) { this.coefficient = c / 10; this.exponent = e + 1; return this; }
+        // Slow path: large carry, cancellation to subnormal, or non-finite.
+        if (!isFinite(c)) { this.coefficient = 0; this.exponent = 0; return this; }
+        const shift = Math.floor(Math.log10(abs));
+        const scale = pow10(shift);
+        if (scale === 0) { this.coefficient = 0; this.exponent = 0; return this; }
+        this.coefficient = c / scale;
+        this.exponent = e + shift;
+        return this;
+    }
+
+    // ── Factories ──────────────────────────────────────────────────────────────
+
+    /**
+     * Returns a fresh, unfrozen copy of this number. The canonical way to preserve
+     * a value before mutating it:
+     *
+     * ```ts
+     * const before = gold.clone();
+     * gold.add(drop);
+     * ```
+     */
+    public clone(): ArbitraryNumber {
+        return ArbitraryNumber.unsafe(this.coefficient, this.exponent);
     }
 
     /**
-     * Returns `this + other`.
+     * Creates an `ArbitraryNumber` from a plain JavaScript `number`.
      *
-     * When the exponent difference exceeds {@link PrecisionCutoff}, the smaller
-     * operand has no effect and the larger is returned as-is.
+     * @throws `ArbitraryNumberInputError` for `NaN`, `Infinity`, or `-Infinity`.
      *
      * @example
-     * new ArbitraryNumber(1.5, 3).add(new ArbitraryNumber(2.5, 3)); // 4*10^3
+     * ArbitraryNumber.from(1500);  // { coefficient: 1.5, exponent: 3 }
      */
-    public add(other: ArbitraryNumber): ArbitraryNumber {
-        if (this.coefficient === 0) return other;
-        if (other.coefficient === 0) return this;
-
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
-        const diff = this.exponent - other.exponent;
-        if (diff > cutoff) return this;
-        if (diff < -cutoff) return other;
-
-        let c: number;
-        let e: number;
-        if (diff >= 0) {
-            c = this.coefficient + other.coefficient / pow10Int(diff);
-            e = this.exponent;
-        } else {
-            c = other.coefficient + this.coefficient / pow10Int(-diff);
-            e = other.exponent;
+    public static from(value: number): ArbitraryNumber {
+        if (!isFinite(value)) {
+            throw new ArbitraryNumberInputError("ArbitraryNumber.from: value must be finite", value);
         }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return new ArbitraryNumber(value, 0);
     }
 
     /**
-     * Returns `this - other`.
+     * Like `from`, but returns `null` instead of throwing for non-finite inputs.
+     *
+     * Use at system boundaries (form inputs, external APIs) where bad input should
+     * be handled gracefully.
      *
      * @example
-     * new ArbitraryNumber(3.5, 3).sub(new ArbitraryNumber(1.5, 3)); // 2*10^3
+     * ArbitraryNumber.tryFrom(Infinity) // null
+     * ArbitraryNumber.tryFrom(1500)     // ArbitraryNumber { coefficient: 1.5, exponent: 3 }
      */
-    public sub(other: ArbitraryNumber): ArbitraryNumber {
+    public static tryFrom(value: number): Nullable<ArbitraryNumber> {
+        if (!isFinite(value)) return null;
+
+        return new ArbitraryNumber(value, 0);
+    }
+
+    // ── Static arithmetic (allocate) ───────────────────────────────────────────
+
+    /**
+     * Returns a **new** instance equal to `a + b`.
+     *
+     * Static methods always allocate — use instance `.add()` on hot paths.
+     */
+    public static add(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.clone().add(b);
+    }
+
+    /**
+     * Returns a **new** instance equal to `a - b`.
+     */
+    public static sub(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.clone().sub(b);
+    }
+
+    /**
+     * Returns a **new** instance equal to `a * b`.
+     */
+    public static mul(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.clone().mul(b);
+    }
+
+    /**
+     * Returns a **new** instance equal to `a / b`.
+     *
+     * @throws `"Division by zero"` when `b` is zero.
+     */
+    public static div(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.clone().div(b);
+    }
+
+    // ── Instance arithmetic (mutate this) ──────────────────────────────────────
+
+    /**
+     * Adds `other` to this number in-place.
+     *
+     * When the exponent difference exceeds `defaults.scaleCutoff`, the smaller
+     * operand has no effect and `this` is returned unchanged.
+     *
+     * **Mutates `this`. Returns `this`.**
+     *
+     * @example
+     * gold.add(drop); // gold is mutated
+     */
+    public add(other: ArbitraryNumber): this {
         if (other.coefficient === 0) return this;
-
-        const negC = -other.coefficient;
-        if (this.coefficient === 0) return ArbitraryNumber.createNormalized(negC, other.exponent);
-
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
-        const diff = this.exponent - other.exponent;
-        if (diff > cutoff) return this;
-        if (diff < -cutoff) return ArbitraryNumber.createNormalized(negC, other.exponent);
-
-        let c: number;
-        let e: number;
-        if (diff >= 0) {
-            c = this.coefficient + negC / pow10Int(diff);
-            e = this.exponent;
-        } else {
-            c = negC + this.coefficient / pow10Int(-diff);
-            e = other.exponent;
+        if (this.coefficient === 0) {
+            this.coefficient = other.coefficient;
+            this.exponent = other.exponent;
+            return this;
         }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = this.exponent - other.exponent;
+        if (diff > cutoff) return this;
+        if (diff < -cutoff) {
+            this.coefficient = other.coefficient;
+            this.exponent = other.exponent;
+            return this;
+        }
+
+        // snapshot other before writing (self-reference safety: a.add(a))
+        const oc = other.coefficient;
+        const oe = other.exponent;
+
+        let c: number, e: number;
+        if (diff >= 0) {
+            c = this.coefficient + oc / pow10(diff);
+            e = this.exponent;
+        } else {
+            c = oc + this.coefficient / pow10(-diff);
+            e = oe;
+        }
+
+        return this._normalizeInto(c, e);
     }
 
     /**
-     * Returns `this * other`.
+     * Subtracts `other` from this number in-place.
      *
-     * @example
-     * new ArbitraryNumber(2, 3).mul(new ArbitraryNumber(3, 4)); // 6*10^7
+     * **Mutates `this`. Returns `this`.**
      */
-    public mul(other: ArbitraryNumber): ArbitraryNumber {
-        if (this.coefficient === 0 || other.coefficient === 0) return ArbitraryNumber.Zero;
+    public sub(other: ArbitraryNumber): this {
+        if (other.coefficient === 0) return this;
+
+        // snapshot other (self-reference safety)
+        const oc = other.coefficient;
+        const oe = other.exponent;
+        const negOc = -oc;
+
+        if (this.coefficient === 0) {
+            this.coefficient = negOc;
+            this.exponent = oe;
+            return this;
+        }
+
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = this.exponent - oe;
+        if (diff > cutoff) return this;
+        if (diff < -cutoff) {
+            this.coefficient = negOc;
+            this.exponent = oe;
+            return this;
+        }
+
+        let c: number, e: number;
+        if (diff >= 0) {
+            c = this.coefficient + negOc / pow10(diff);
+            e = this.exponent;
+        } else {
+            c = negOc + this.coefficient / pow10(-diff);
+            e = oe;
+        }
+
+        return this._normalizeInto(c, e);
+    }
+
+    /**
+     * Multiplies this number by `other` in-place.
+     *
+     * **Mutates `this`. Returns `this`.**
+     */
+    public mul(other: ArbitraryNumber): this {
+        if (this.coefficient === 0) return this;
+        if (other.coefficient === 0) {
+            this.coefficient = 0;
+            this.exponent = 0;
+            return this;
+        }
 
         const c = this.coefficient * other.coefficient;
         const e = this.exponent + other.exponent;
         const absC = c < 0 ? -c : c;
-        if (absC >= 10) return ArbitraryNumber.createNormalized(c / 10, e + 1);
+        if (absC >= 10) {
+            this.coefficient = c / 10;
+            this.exponent = e + 1;
+        } else {
+            this.coefficient = c;
+            this.exponent = e;
+        }
 
-        return ArbitraryNumber.createNormalized(c, e);
+        return this;
     }
 
     /**
-     * Returns `this / other`.
+     * Divides this number by `other` in-place.
      *
-     * @example
-     * new ArbitraryNumber(6, 7).div(new ArbitraryNumber(3, 4)); // 2*10^3
+     * **Mutates `this`. Returns `this`.**
      *
      * @throws `"Division by zero"` when `other` is zero.
      */
-    public div(other: ArbitraryNumber): ArbitraryNumber {
-        if (other.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
+    public div(other: ArbitraryNumber): this {
+        if (other.coefficient === 0) {
+            throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
+        }
+        if (this.coefficient === 0) return this;
 
         const c = this.coefficient / other.coefficient;
         const e = this.exponent - other.exponent;
-        if (c === 0) return ArbitraryNumber.Zero;
+        if (c === 0) {
+            this.coefficient = 0;
+            this.exponent = 0;
+            return this;
+        }
 
         const absC = c < 0 ? -c : c;
-        if (absC < 1) return ArbitraryNumber.createNormalized(c * 10, e - 1);
+        if (absC < 1) {
+            this.coefficient = c * 10;
+            this.exponent = e - 1;
+        } else {
+            this.coefficient = c;
+            this.exponent = e;
+        }
 
-        return ArbitraryNumber.createNormalized(c, e);
+        return this;
     }
 
     /**
-     * Returns the arithmetic negation of this number (`-this`).
+     * Negates this number in-place.
      *
-     * @example
-     * new ArbitraryNumber(1.5, 3).negate(); // -1.5*10^3
+     * **Mutates `this`. Returns `this`.**
      */
-    public negate(): ArbitraryNumber {
-        if (this.coefficient === 0) return ArbitraryNumber.Zero;
-
-        return ArbitraryNumber.createNormalized(-this.coefficient, this.exponent);
+    public negate(): this {
+        this.coefficient = -this.coefficient;
+        return this;
     }
 
     /**
-     * Returns the absolute value of this number (`|this|`).
+     * Sets this number to its absolute value in-place.
      *
-     * Returns `this` unchanged when the number is already non-negative.
-     *
-     * @example
-     * new ArbitraryNumber(-1.5, 3).abs(); // 1.5*10^3
+     * **Mutates `this`. Returns `this`.**
      */
-    public abs(): ArbitraryNumber {
-        if (this.coefficient >= 0) return this;
-
-        return ArbitraryNumber.createNormalized(-this.coefficient, this.exponent);
+    public abs(): this {
+        if (this.coefficient < 0) this.coefficient = -this.coefficient;
+        return this;
     }
 
     /**
-     * Returns `this^n`.
+     * Raises this number to the power `n` in-place.
      *
      * Supports integer, fractional, and negative exponents.
-     * `x^0` always returns {@link One}, including `0^0` (by convention).
+     * `x^0` always sets `this` to `1`, including `0^0` (by convention).
      *
-     * @example
-     * new ArbitraryNumber(2, 3).pow(2);  // 4*10^6
-     * new ArbitraryNumber(2, 0).pow(-1); // 5*10^-1  (= 0.5)
+     * **Mutates `this`. Returns `this`.**
      *
-     * @param n - The exponent to raise this number to.
      * @throws `"Zero cannot be raised to a negative power"` when this is zero and `n < 0`.
      */
-    public pow(n: number): ArbitraryNumber {
+    public pow(n: number): this {
         if (n === 0) {
-            return ArbitraryNumber.One;
+            this.coefficient = 1;
+            this.exponent = 0;
+            return this;
         }
 
         if (this.coefficient === 0) {
@@ -285,125 +420,162 @@ export class ArbitraryNumber implements NormalizedNumber {
                 throw new ArbitraryNumberDomainError("Zero cannot be raised to a negative power", { exponent: n });
             }
 
-            return ArbitraryNumber.Zero;
+            return this;
         }
 
         if (this.coefficient < 0 && !Number.isInteger(n)) {
-            throw new ArbitraryNumberDomainError("ArbitraryNumber.pow: fractional exponent of a negative base is not supported", { base: this.toNumber(), exponent: n });
+            throw new ArbitraryNumberDomainError(
+                "ArbitraryNumber.pow: fractional exponent of a negative base is not supported",
+                { base: this.toNumber(), exponent: n },
+            );
         }
 
         const rawExp = this.exponent * n;
         const intExp = Math.floor(rawExp);
         const fracExp = rawExp - intExp;
-        return new ArbitraryNumber(
-            Math.pow(this.coefficient, n) * pow10(fracExp),
-            intExp,
-        );
+        const newC = Math.pow(this.coefficient, n) * pow10(fracExp);
+        return this._normalizeInto(newC, intExp);
     }
 
     /**
-     * Fused multiply-add: `(this * multiplier) + addend`.
+     * Fused multiply-add in-place: `this = (this * multiplier) + addend`.
      *
-     * Faster than `.mul(multiplier).add(addend)` because it avoids allocating an
-     * intermediate ArbitraryNumber for the product. One normalisation pass total.
+     * Faster than `.mul(multiplier).add(addend)` — one normalisation pass total, no
+     * intermediate allocation.
      *
-     * Common pattern - prestige loop: `value = value.mulAdd(prestigeMultiplier, prestigeBoost)`
-     *
-     * @example
-     * // Equivalent to value.mul(mult).add(boost) but ~35-50% faster
-     * const prestiged = currentValue.mulAdd(multiplier, boost);
+     * **Mutates `this`. Returns `this`.**
      */
-    public mulAdd(multiplier: ArbitraryNumber, addend: ArbitraryNumber): ArbitraryNumber {
-        // Step 1: Multiply (this * multiplier).
-        // Both coefficients in [1, 10) so the product in [1, 100) - at most one normalisation step.
-        if (this.coefficient === 0 || multiplier.coefficient === 0) return addend;
+    public mulAdd(multiplier: ArbitraryNumber, addend: ArbitraryNumber): this {
+        if (this.coefficient === 0 || multiplier.coefficient === 0) {
+            this.coefficient = addend.coefficient;
+            this.exponent = addend.exponent;
+            return this;
+        }
 
-        let cp = this.coefficient * multiplier.coefficient;  // product coefficient
-        let ep = this.exponent + multiplier.exponent;         // product exponent
+        // snapshot addend before touching this (self-ref safety)
+        const ac = addend.coefficient;
+        const ae = addend.exponent;
 
+        let cp = this.coefficient * multiplier.coefficient;
+        let ep = this.exponent + multiplier.exponent;
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; ep += 1; }
 
-        if (addend.coefficient === 0) return ArbitraryNumber.createNormalized(cp, ep);
+        if (ac === 0) {
+            this.coefficient = cp;
+            this.exponent = ep;
+            return this;
+        }
 
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
-        const diff = ep - addend.exponent;
-        if (diff > cutoff) return ArbitraryNumber.createNormalized(cp, ep);
-        if (diff < -cutoff) return addend;
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = ep - ae;
+        if (diff > cutoff) {
+            this.coefficient = cp;
+            this.exponent = ep;
+            return this;
+        }
+        if (diff < -cutoff) {
+            this.coefficient = ac;
+            this.exponent = ae;
+            return this;
+        }
 
         let c: number, e: number;
         if (diff >= 0) {
-            c = cp + addend.coefficient / pow10Int(diff);
+            c = cp + ac / pow10(diff);
             e = ep;
         } else {
-            c = addend.coefficient + cp / pow10Int(-diff);
-            e = addend.exponent;
+            c = ac + cp / pow10(-diff);
+            e = ae;
         }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return this._normalizeInto(c, e);
     }
 
     /**
-     * Fused add-multiply: `(this + addend) * multiplier`.
+     * @internal
+     * Computes `(this + sign * addendC * 10^addendE)` and writes the normalised
+     * result back into `this`. Used by `addMul` and `subMul` to share the alignment
+     * logic without duplication.
      *
-     * Faster than `.add(addend).mul(multiplier)` because it avoids allocating an
-     * intermediate ArbitraryNumber for the sum. One normalisation pass total.
-     *
-     * Common pattern - upgrade calculation: `newValue = baseValue.addMul(bonus, multiplier)`
-     *
-     * @example
-     * // Equivalent to base.add(bonus).mul(multiplier) but ~20-25% faster
-     * const upgraded = baseValue.addMul(bonus, multiplier);
+     * Returns the sign-adjusted addend coefficient so callers can detect the
+     * zero-result case. Writes the intermediate normalised sum into `this.coefficient`
+     * / `this.exponent` ready for the subsequent multiply step.
      */
-    public addMul(addend: ArbitraryNumber, multiplier: ArbitraryNumber): ArbitraryNumber {
-        if (multiplier.coefficient === 0) return ArbitraryNumber.Zero;
+    private _addScaledInto(addendC: number, addendE: number): void {
+        if (this.coefficient === 0) {
+            this.coefficient = addendC; this.exponent = addendE; return;
+        }
+        if (addendC === 0) return; // this is already correct
+
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = this.exponent - addendE;
+        if (diff > cutoff) return;
+        if (diff < -cutoff) { this.coefficient = addendC; this.exponent = addendE; return; }
 
         let cs: number, es: number;
-
-        if (this.coefficient === 0 && addend.coefficient === 0) return ArbitraryNumber.Zero;
-        if (this.coefficient === 0) { cs = addend.coefficient; es = addend.exponent; }
-        else if (addend.coefficient === 0) { cs = this.coefficient; es = this.exponent; }
-        else {
-            const cutoff = ArbitraryNumber.PrecisionCutoff;
-            const diff = this.exponent - addend.exponent;
-            if (diff > cutoff) { cs = this.coefficient; es = this.exponent; }
-            else if (diff < -cutoff) { cs = addend.coefficient; es = addend.exponent; }
-            else {
-                if (diff >= 0) { cs = this.coefficient + addend.coefficient / pow10Int(diff); es = this.exponent; }
-                else { cs = addend.coefficient + this.coefficient / pow10Int(-diff); es = addend.exponent; }
-
-                if (cs === 0) return ArbitraryNumber.Zero;
-
-                const abs = Math.abs(cs);
-                const shift = Math.floor(Math.log10(abs));
-                const scale = pow10(shift);
-                if (scale === 0) return ArbitraryNumber.Zero;
-
-                cs /= scale;
-                es += shift;
-            }
+        if (diff >= 0) {
+            cs = this.coefficient + addendC / pow10(diff); es = this.exponent;
+        } else {
+            cs = addendC + this.coefficient / pow10(-diff); es = addendE;
         }
 
-        let cp = cs * multiplier.coefficient;
-        const ep = es + multiplier.exponent;
-        const absCp = cp < 0 ? -cp : cp;
-        if (absCp >= 10) { cp /= 10; return ArbitraryNumber.createNormalized(cp, ep + 1); }
-
-        return ArbitraryNumber.createNormalized(cp, ep);
+        // Inline fast-normalize (same logic as _normalizeInto but without calling it
+        // so V8 can see this is a continuation of the same JIT unit).
+        if (cs === 0) { this.coefficient = 0; this.exponent = 0; return; }
+        const abs = cs < 0 ? -cs : cs;
+        if (abs < 10) {
+            if (abs >= 1) { this.coefficient = cs; this.exponent = es; return; }
+            this.coefficient = cs * 10; this.exponent = es - 1; return;
+        }
+        if (abs < 100) { this.coefficient = cs / 10; this.exponent = es + 1; return; }
+        if (!isFinite(cs)) { this.coefficient = 0; this.exponent = 0; return; }
+        const shift = Math.floor(Math.log10(abs));
+        const scale = pow10(shift);
+        if (scale === 0) { this.coefficient = 0; this.exponent = 0; return; }
+        this.coefficient = cs / scale; this.exponent = es + shift;
     }
 
     /**
-     * Fused multiply-subtract: `(this * multiplier) - subtrahend`.
+     * Fused add-multiply in-place: `this = (this + addend) * multiplier`.
      *
-     * Avoids one intermediate allocation vs `.mul(multiplier).sub(subtrahend)`.
-     *
-     * Common pattern - resource drain: `income.mulSub(rate, upkeepCost)`
+     * **Mutates `this`. Returns `this`.**
      */
-    public mulSub(multiplier: ArbitraryNumber, subtrahend: ArbitraryNumber): ArbitraryNumber {
-        if (this.coefficient === 0 || multiplier.coefficient === 0) {
-            if (subtrahend.coefficient === 0) return ArbitraryNumber.Zero;
+    public addMul(addend: ArbitraryNumber, multiplier: ArbitraryNumber): this {
+        if (multiplier.coefficient === 0) {
+            this.coefficient = 0; this.exponent = 0; return this;
+        }
+        // snapshot all args before any write (self-ref safety)
+        const ac = addend.coefficient;
+        const ae = addend.exponent;
+        const mc = multiplier.coefficient;
+        const me = multiplier.exponent;
 
-            return ArbitraryNumber.createNormalized(-subtrahend.coefficient, subtrahend.exponent);
+        this._addScaledInto(ac, ae);
+        if (this.coefficient === 0) return this;
+
+        let cp = this.coefficient * mc;
+        const ep = this.exponent + me;
+        const absCp = cp < 0 ? -cp : cp;
+        if (absCp >= 10) { cp /= 10; this.coefficient = cp; this.exponent = ep + 1; return this; }
+        this.coefficient = cp; this.exponent = ep;
+        return this;
+    }
+
+    /**
+     * Fused multiply-subtract in-place: `this = (this * multiplier) - subtrahend`.
+     *
+     * **Mutates `this`. Returns `this`.**
+     */
+    public mulSub(multiplier: ArbitraryNumber, subtrahend: ArbitraryNumber): this {
+        // snapshot before writing
+        const sc = subtrahend.coefficient;
+        const se = subtrahend.exponent;
+
+        if (this.coefficient === 0 || multiplier.coefficient === 0) {
+            this.coefficient = sc === 0 ? 0 : -sc;
+            this.exponent = sc === 0 ? 0 : se;
+            return this;
         }
 
         let cp = this.coefficient * multiplier.coefficient;
@@ -411,196 +583,191 @@ export class ArbitraryNumber implements NormalizedNumber {
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; ep += 1; }
 
-        if (subtrahend.coefficient === 0) return ArbitraryNumber.createNormalized(cp, ep);
-
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
-        const diff = ep - subtrahend.exponent;
-        if (diff > cutoff) return ArbitraryNumber.createNormalized(cp, ep);
-        if (diff < -cutoff) {
-            return ArbitraryNumber.createNormalized(-subtrahend.coefficient, subtrahend.exponent);
+        if (sc === 0) {
+            this.coefficient = cp; this.exponent = ep; return this;
         }
+
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = ep - se;
+        if (diff > cutoff) { this.coefficient = cp; this.exponent = ep; return this; }
+        if (diff < -cutoff) { this.coefficient = -sc; this.exponent = se; return this; }
 
         let c: number, e: number;
-        if (diff >= 0) {
-            c = cp - subtrahend.coefficient / pow10Int(diff);
-            e = ep;
-        } else {
-            c = -subtrahend.coefficient + cp / pow10Int(-diff);
-            e = subtrahend.exponent;
-        }
+        if (diff >= 0) { c = cp - sc / pow10(diff); e = ep; }
+        else           { c = -sc + cp / pow10(-diff); e = se; }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return this._normalizeInto(c, e);
     }
 
     /**
-     * Fused subtract-multiply: `(this - subtrahend) * multiplier`.
+     * Fused subtract-multiply in-place: `this = (this - subtrahend) * multiplier`.
      *
-     * Avoids one intermediate allocation vs `.sub(subtrahend).mul(multiplier)`.
-     *
-     * Common pattern - upgrade after penalty: `health.subMul(damage, multiplier)`
+     * **Mutates `this`. Returns `this`.**
      */
-    public subMul(subtrahend: ArbitraryNumber, multiplier: ArbitraryNumber): ArbitraryNumber {
-        if (multiplier.coefficient === 0) return ArbitraryNumber.Zero;
-
-        let cs: number, es: number;
-
-        if (this.coefficient === 0 && subtrahend.coefficient === 0) return ArbitraryNumber.Zero;
-        if (this.coefficient === 0) {
-            cs = -subtrahend.coefficient; es = subtrahend.exponent;
-        } else if (subtrahend.coefficient === 0) {
-            cs = this.coefficient; es = this.exponent;
-        } else {
-            const cutoff = ArbitraryNumber.PrecisionCutoff;
-            const diff = this.exponent - subtrahend.exponent;
-            if (diff > cutoff) { cs = this.coefficient; es = this.exponent; }
-            else if (diff < -cutoff) {
-                cs = -subtrahend.coefficient; es = subtrahend.exponent;
-            } else {
-                if (diff >= 0) {
-                    cs = this.coefficient - subtrahend.coefficient / pow10Int(diff); es = this.exponent;
-                } else {
-                    cs = -subtrahend.coefficient + this.coefficient / pow10Int(-diff); es = subtrahend.exponent;
-                }
-                if (cs === 0) return ArbitraryNumber.Zero;
-
-                const abs = Math.abs(cs);
-                const shift = Math.floor(Math.log10(abs));
-                const scale = pow10(shift);
-                if (scale === 0) return ArbitraryNumber.Zero;
-
-                cs /= scale; es += shift;
-            }
+    public subMul(subtrahend: ArbitraryNumber, multiplier: ArbitraryNumber): this {
+        if (multiplier.coefficient === 0) {
+            this.coefficient = 0; this.exponent = 0; return this;
         }
+        // snapshot all args before any write (self-ref safety)
+        const sc = subtrahend.coefficient;
+        const se = subtrahend.exponent;
+        const mc = multiplier.coefficient;
+        const me = multiplier.exponent;
 
-        let cp = cs * multiplier.coefficient;
-        const ep = es + multiplier.exponent;
+        this._addScaledInto(-sc, se);
+        if (this.coefficient === 0) return this;
+
+        let cp = this.coefficient * mc;
+        const ep = this.exponent + me;
         const absCp = cp < 0 ? -cp : cp;
-        if (absCp >= 10) { cp /= 10; return ArbitraryNumber.createNormalized(cp, ep + 1); }
-
-        return ArbitraryNumber.createNormalized(cp, ep);
+        if (absCp >= 10) { cp /= 10; this.coefficient = cp; this.exponent = ep + 1; return this; }
+        this.coefficient = cp; this.exponent = ep;
+        return this;
     }
 
     /**
-     * Fused divide-add: `(this / divisor) + addend`.
+     * Fused divide-add in-place: `this = (this / divisor) + addend`.
      *
-     * Avoids one intermediate allocation vs `.div(divisor).add(addend)`.
-     *
-     * Common pattern - efficiency bonus: `damage.divAdd(armor, flat)`
+     * **Mutates `this`. Returns `this`.**
      *
      * @throws `"Division by zero"` when divisor is zero.
      */
-    public divAdd(divisor: ArbitraryNumber, addend: ArbitraryNumber): ArbitraryNumber {
-        if (divisor.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
+    public divAdd(divisor: ArbitraryNumber, addend: ArbitraryNumber): this {
+        if (divisor.coefficient === 0) {
+            throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
+        }
 
-        if (this.coefficient === 0) return addend;
+        // snapshot addend
+        const ac = addend.coefficient;
+        const ae = addend.exponent;
+
+        if (this.coefficient === 0) {
+            this.coefficient = ac;
+            this.exponent = ae;
+            return this;
+        }
 
         let cd = this.coefficient / divisor.coefficient;
         let ed = this.exponent - divisor.exponent;
         const absC = cd < 0 ? -cd : cd;
         if (absC < 1) { cd *= 10; ed -= 1; }
 
-        if (addend.coefficient === 0) return ArbitraryNumber.createNormalized(cd, ed);
+        if (ac === 0) {
+            this.coefficient = cd;
+            this.exponent = ed;
+            return this;
+        }
 
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
-        const diff = ed - addend.exponent;
-        if (diff > cutoff) return ArbitraryNumber.createNormalized(cd, ed);
-        if (diff < -cutoff) return addend;
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const diff = ed - ae;
+        if (diff > cutoff) {
+            this.coefficient = cd;
+            this.exponent = ed;
+            return this;
+        }
+        if (diff < -cutoff) {
+            this.coefficient = ac;
+            this.exponent = ae;
+            return this;
+        }
 
         let c: number, e: number;
-        if (diff >= 0) { c = cd + addend.coefficient / pow10Int(diff); e = ed; }
-        else { c = addend.coefficient + cd / pow10Int(-diff); e = addend.exponent; }
+        if (diff >= 0) { c = cd + ac / pow10(diff); e = ed; }
+        else { c = ac + cd / pow10(-diff); e = ae; }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return this._normalizeInto(c, e);
     }
 
     /**
-     * Fused multiply-divide: `(this * multiplier) / divisor`.
+     * Fused multiply-divide in-place: `this = (this * multiplier) / divisor`.
      *
-     * Avoids one intermediate allocation vs `.mul(multiplier).div(divisor)`.
-     * The divisor zero-check is performed before the multiply to avoid unnecessary work.
-     *
-     * Common pattern - idle-tick math: `(production * deltaTime) / cost`
-     *
-     * @example
-     * // Equivalent to production.mul(deltaTime).div(cost) but ~30-40% faster
-     * const consumed = production.mulDiv(deltaTime, cost);
+     * **Mutates `this`. Returns `this`.**
      *
      * @throws `"Division by zero"` when divisor is zero.
      */
-    public mulDiv(multiplier: ArbitraryNumber, divisor: ArbitraryNumber): ArbitraryNumber {
-        if (divisor.coefficient === 0) throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
-        if (this.coefficient === 0 || multiplier.coefficient === 0) return ArbitraryNumber.Zero;
+    public mulDiv(multiplier: ArbitraryNumber, divisor: ArbitraryNumber): this {
+        if (divisor.coefficient === 0) {
+            throw new ArbitraryNumberDomainError("Division by zero", { dividend: this.toNumber(), divisor: 0 });
+        }
+        if (this.coefficient === 0) return this;
+        if (multiplier.coefficient === 0) {
+            this.coefficient = 0;
+            this.exponent = 0;
+            return this;
+        }
 
         const c = (this.coefficient * multiplier.coefficient) / divisor.coefficient;
         const e = this.exponent + multiplier.exponent - divisor.exponent;
 
         const absC = c < 0 ? -c : c;
-        if (absC >= 10) return ArbitraryNumber.createNormalized(c / 10, e + 1);
-        if (absC < 1) return ArbitraryNumber.createNormalized(c * 10, e - 1);
+        if (absC >= 10) {
+            this.coefficient = c / 10;
+            this.exponent = e + 1;
+        } else if (absC < 1) {
+            this.coefficient = c * 10;
+            this.exponent = e - 1;
+        } else {
+            this.coefficient = c;
+            this.exponent = e;
+        }
 
-        return ArbitraryNumber.createNormalized(c, e);
+        return this;
     }
 
+    // ── Batch (static, allocate) ───────────────────────────────────────────────
+
     /**
-     * Efficiently sums an array of ArbitraryNumbers in a single normalisation pass.
+     * Efficiently sums an array of `ArbitraryNumber`s in a single pass.
      *
-     * **Why it's fast:** standard chained `.add()` normalises after every element (N log10 calls).
-     * `sumArray` aligns all coefficients to the largest exponent (pivot), sums them,
-     * then normalises once - regardless of array size.
+     * Maintains a running pivot exponent and rescales the accumulator when a larger
+     * exponent is encountered — one pass, no pre-scan needed.
      *
-     * For 50 elements: chained add ~ 50 log10 calls + 50 allocations;
-     * sumArray ~ 50 divisions + 1 log10 call + 1 allocation -> ~9* faster.
-     *
-     * Common pattern - income aggregation: `total = ArbitraryNumber.sumArray(incomeSourcesPerTick)`
-     *
-     * @example
-     * const total = ArbitraryNumber.sumArray(incomeSources); // far faster than .reduce((a, b) => a.add(b))
-     *
-     * @param numbers - Array to sum. Empty array returns {@link Zero}. Single element returned as-is.
+     * Empty array returns `Zero`. Single element returned as-is (no clone).
      */
     public static sumArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         const len = numbers.length;
         if (len === 0) return ArbitraryNumber.Zero;
         if (len === 1) return numbers[0]!;
 
-        let pivotExp = numbers[0]!.exponent;
-        for (let i = 1; i < len; i++) {
-            const n = numbers[i]!;
-            if (n.exponent > pivotExp) pivotExp = n.exponent;
-        }
-
-        const cutoff = ArbitraryNumber.PrecisionCutoff;
+        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        let pivot = -Infinity;
         let total = 0;
+
         for (let i = 0; i < len; i++) {
             const n = numbers[i]!;
             if (n.coefficient === 0) continue;
 
-            const diff = pivotExp - n.exponent;
-            if (diff > cutoff) continue;
-
-            total += n.coefficient / pow10Int(diff);
+            if (n.exponent > pivot) {
+                if (pivot !== -Infinity) {
+                    const drop = n.exponent - pivot;
+                    total = drop > cutoff ? 0 : total / pow10(drop);
+                }
+                pivot = n.exponent;
+                total += n.coefficient;
+            } else {
+                const diff = pivot - n.exponent;
+                if (diff <= cutoff) total += n.coefficient / pow10(diff);
+            }
         }
 
-        if (total === 0) return ArbitraryNumber.Zero;
+        if (total === 0 || pivot === -Infinity) return ArbitraryNumber.Zero;
 
-        const abs = Math.abs(total);
+        const abs = total < 0 ? -total : total;
+        if (abs < 10) {
+            if (abs >= 1) return ArbitraryNumber.unsafe(total, pivot);
+            return ArbitraryNumber.unsafe(total * 10, pivot - 1);
+        }
+        if (abs < 100) return ArbitraryNumber.unsafe(total / 10, pivot + 1);
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) return ArbitraryNumber.Zero;
-
-        return ArbitraryNumber.createNormalized(total / scale, pivotExp + shift);
+        return ArbitraryNumber.unsafe(total / scale, pivot + shift);
     }
 
     /**
      * Multiplies an array of `ArbitraryNumber`s in a single pass.
      *
-     * Coefficients are multiplied together with intermediate normalisation after each step
-     * to keep values in [1, 10). Exponents are summed. One total normalisation at the end.
-     *
-     * Empty array returns {@link One}. Single element returned as-is.
-     *
-     * @example
-     * ArbitraryNumber.productArray([an(2), an(3), an(4)]); // 24
+     * Empty array returns `One`. Single element returned as-is.
      */
     public static productArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         const len = numbers.length;
@@ -617,28 +784,19 @@ export class ArbitraryNumber implements NormalizedNumber {
             c *= n.coefficient;
             e += n.exponent;
 
-            if (c >= 10 || c <= -10) {
-                const absC = c < 0 ? -c : c;
-                const shift = Math.floor(Math.log10(absC));
-                c /= pow10(shift);
-                e += shift;
-            }
+            // All inputs are normalised (|c| ∈ [1,10)), so the product is in [1,100).
+            // A single one-step renorm is always sufficient.
+            if (c >= 10 || c <= -10) { c /= 10; e += 1; }
         }
 
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return ArbitraryNumber._normalizeNew(c, e);
     }
 
     /**
-     * Returns the largest value in an array.
-     *
-     * Empty array returns {@link Zero}. Single element returned as-is.
-     *
-     * @example
-     * ArbitraryNumber.maxOfArray([an(1), an(3), an(2)]); // an(3)
+     * Returns the largest value in an array. Empty array returns `Zero`.
      */
     public static maxOfArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         if (numbers.length === 0) return ArbitraryNumber.Zero;
-
         let max = numbers[0]!;
         for (let i = 1; i < numbers.length; i++) {
             if (numbers[i]!.greaterThan(max)) max = numbers[i]!;
@@ -648,16 +806,10 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns the smallest value in an array.
-     *
-     * Empty array returns {@link Zero}. Single element returned as-is.
-     *
-     * @example
-     * ArbitraryNumber.minOfArray([an(3), an(1), an(2)]); // an(1)
+     * Returns the smallest value in an array. Empty array returns `Zero`.
      */
     public static minOfArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         if (numbers.length === 0) return ArbitraryNumber.Zero;
-
         let min = numbers[0]!;
         for (let i = 1; i < numbers.length; i++) {
             if (numbers[i]!.lessThan(min)) min = numbers[i]!;
@@ -666,199 +818,142 @@ export class ArbitraryNumber implements NormalizedNumber {
         return min;
     }
 
-    /**
-     * Compares this number to `other`.
-     *
-     * @returns `1` if `this > other`, `-1` if `this < other`, `0` if equal.
-     *
-     * @example
-     * new ArbitraryNumber(1, 4).compareTo(new ArbitraryNumber(9, 3)); // 1  (10000 > 9000)
-     * new ArbitraryNumber(-1, 4).compareTo(new ArbitraryNumber(1, 3)); // -1 (-10000 < 1000)
-     */
-    public compareTo(other: ArbitraryNumber): number {
-        const thisNegative = this.coefficient < 0;
-        const otherNegative = other.coefficient < 0;
-
-        if (thisNegative !== otherNegative) {
-            return thisNegative ? -1 : 1;
-        }
-
-        if (this.exponent !== other.exponent) {
-            // Zero is stored as {coefficient: 0, exponent: 0}.  Without the guard below,
-            // Zero.compareTo({c: 5, e: -1}) would hit the exponent branch and return 1
-            // (0 > -1) instead of the correct -1 (0 < 0.5).  The guard is inside the
-            // exponent-differs branch so the same-exponent hot path pays zero extra cost.
-            if (this.coefficient === 0) return otherNegative ? 1 : -1;
-            if (other.coefficient === 0) return thisNegative ? -1 : 1;
-
-            const thisExponentIsHigher = this.exponent > other.exponent;
-            return thisNegative
-                ? (thisExponentIsHigher ? -1 : 1)
-                : (thisExponentIsHigher ? 1 : -1);
-        }
-
-        if (this.coefficient !== other.coefficient) {
-            return this.coefficient > other.coefficient ? 1 : -1;
-        }
-
-        return 0;
-    }
-
-    /** Returns `true` if `this > other`. */
-    public greaterThan(other: ArbitraryNumber): boolean {
-        return this.compareTo(other) > 0;
-    }
-
-    /** Returns `true` if `this < other`. */
-    public lessThan(other: ArbitraryNumber): boolean {
-        return this.compareTo(other) < 0;
-    }
-
-    /** Returns `true` if `this >= other`. */
-    public greaterThanOrEqual(other: ArbitraryNumber): boolean {
-        return this.compareTo(other) >= 0;
-    }
-
-    /** Returns `true` if `this <= other`. */
-    public lessThanOrEqual(other: ArbitraryNumber): boolean {
-        return this.compareTo(other) <= 0;
-    }
-
-    /** Returns `true` if `this === other` in value. */
-    public equals(other: ArbitraryNumber): boolean {
-        return this.compareTo(other) === 0;
-    }
+    // ── Rounding (mutate) ──────────────────────────────────────────────────────
 
     /**
-     * Returns the largest integer less than or equal to this number (floor toward -Infinity).
+     * Rounds down to the nearest integer in-place (floor toward −∞).
      *
-     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
-     * and are returned unchanged.
-     *
-     * @example
-     * new ArbitraryNumber(1.7, 0).floor();  // 1
-     * new ArbitraryNumber(-1.7, 0).floor(); // -2
+     * **Mutates `this`. Returns `this`.**
      */
-    public floor(): ArbitraryNumber {
-        if (this.coefficient === 0) {
-            return ArbitraryNumber.Zero;
-        }
+    public floor(): this {
+        if (this.coefficient === 0) return this;
+        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
 
-        if (this.exponent >= ArbitraryNumber.PrecisionCutoff) {
+        if (this.exponent < 0) {
+            this.coefficient = this.coefficient >= 0 ? 0 : -1;
+            this.exponent = 0;
             return this;
         }
 
-        if (this.exponent < 0) {
-            return this.coefficient >= 0 ? ArbitraryNumber.Zero : new ArbitraryNumber(-1, 0);
-        }
-
-        return new ArbitraryNumber(Math.floor(this.coefficient * pow10(this.exponent)), 0);
+        return this._normalizeInto(Math.floor(this.coefficient * pow10(this.exponent)), 0);
     }
 
     /**
-     * Returns the smallest integer greater than or equal to this number (ceil toward +Infinity).
+     * Rounds up to the nearest integer in-place (ceil toward +∞).
      *
-     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
-     * and are returned unchanged.
-     *
-     * @example
-     * new ArbitraryNumber(1.2, 0).ceil();  // 2
-     * new ArbitraryNumber(-1.7, 0).ceil(); // -1
+     * **Mutates `this`. Returns `this`.**
      */
-    public ceil(): ArbitraryNumber {
-        if (this.coefficient === 0) {
-            return ArbitraryNumber.Zero;
-        }
+    public ceil(): this {
+        if (this.coefficient === 0) return this;
+        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
 
-        if (this.exponent >= ArbitraryNumber.PrecisionCutoff) {
+        if (this.exponent < 0) {
+            const ceiled = this.coefficient > 0 ? 1 : 0;
+            this.coefficient = ceiled;
+            this.exponent = 0;
             return this;
         }
 
+        return this._normalizeInto(Math.ceil(this.coefficient * pow10(this.exponent)), 0);
+    }
+
+    /**
+     * Rounds to the nearest integer in-place.
+     *
+     * Uses `Math.round` semantics: half-values round toward positive infinity
+     * (`0.5 → 1`, `-0.5 → 0`). This matches JavaScript's built-in convention.
+     *
+     * **Mutates `this`. Returns `this`.**
+     */
+    public round(): this {
+        if (this.coefficient === 0) return this;
+        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+
         if (this.exponent < 0) {
-            return this.coefficient > 0 ? ArbitraryNumber.One : ArbitraryNumber.Zero;
+            if (this.exponent <= -2) {
+                this.coefficient = 0;
+                this.exponent = 0;
+                return this;
+            }
+            const rounded = Math.round(this.coefficient * 0.1) || 0; // normalize -0 to +0
+            this.coefficient = rounded;
+            this.exponent = 0;
+            return this;
         }
 
-        return new ArbitraryNumber(Math.ceil(this.coefficient * pow10(this.exponent)), 0);
+        return this._normalizeInto(Math.round(this.coefficient * pow10(this.exponent)), 0);
     }
 
     /**
-     * Clamps `value` to the inclusive range `[min, max]`.
+     * Truncates toward zero in-place.
      *
-     * @example
-     * ArbitraryNumber.clamp(new ArbitraryNumber(5, 2), new ArbitraryNumber(1, 3), new ArbitraryNumber(2, 3)); // 1*10^3  (500 clamped to [1000, 2000])
-     *
-     * @param value - The value to clamp.
-     * @param min - Lower bound (inclusive).
-     * @param max - Upper bound (inclusive).
+     * **Mutates `this`. Returns `this`.**
      */
-    public static clamp(value: ArbitraryNumber, min: ArbitraryNumber, max: ArbitraryNumber): ArbitraryNumber {
-        if (value.lessThan(min)) return min;
-        if (value.greaterThan(max)) return max;
-
-        return value;
-    }
-
-    /**
-     * Returns the smaller of `a` and `b`.
-     * @example ArbitraryNumber.min(a, b)
-     */
-    public static min(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
-        return a.lessThan(b) ? a : b;
-    }
-
-    /**
-     * Returns the larger of `a` and `b`.
-     * @example ArbitraryNumber.max(a, b)
-     */
-    public static max(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
-        return a.greaterThan(b) ? a : b;
-    }
-
-    /**
-     * Linear interpolation: `a + (b - a) * t` where `t in [0, 1]` is a plain number.
-     *
-     * Used for smooth animations and tweening in game UIs.
-     * `t = 0` returns `a`; `t = 1` returns `b`.
-     *
-     * @param t - Interpolation factor as a plain `number`. Values outside [0, 1] are allowed (extrapolation).
-     * @example
-     * ArbitraryNumber.lerp(an(100), an(200), 0.5); // 150
-     */
-    public static lerp(a: ArbitraryNumber, b: ArbitraryNumber, t: number): ArbitraryNumber {
-        if (t === 0) return a;
-        if (t === 1) return b;
-
-        return a.add(b.sub(a).mul(ArbitraryNumber.from(t)));
-    }
-
-    /**
-     * Runs `fn` with `PrecisionCutoff` temporarily set to `cutoff`, then restores the previous value.
-     *
-     * Useful when one section of code needs different precision than the rest.
-     *
-     * @example
-     * // Run financial calculation with higher precision
-     * const result = ArbitraryNumber.withPrecision(50, () => a.add(b));
-     */
-    public static withPrecision<T>(cutoff: number, fn: () => T): T {
-        const prev = ArbitraryNumber.PrecisionCutoff;
-        ArbitraryNumber.PrecisionCutoff = cutoff;
-        try {
-            return fn();
-        } finally {
-            ArbitraryNumber.PrecisionCutoff = prev;
+    public trunc(): this {
+        if (this.coefficient === 0) return this;
+        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+        if (this.exponent < 0) {
+            this.coefficient = 0;
+            this.exponent = 0;
+            return this;
         }
+
+        return this._normalizeInto(Math.trunc(this.coefficient * pow10(this.exponent)), 0);
+    }
+
+    // ── Roots & logs ───────────────────────────────────────────────────────────
+
+    /**
+     * Returns √this in-place.
+     *
+     * **Mutates `this`. Returns `this`.**
+     *
+     * @throws `"Square root of negative number"` when this is negative.
+     */
+    public sqrt(): this {
+        if (this.coefficient < 0) {
+            throw new ArbitraryNumberDomainError("Square root of negative number", { value: this.toNumber() });
+        }
+        if (this.coefficient === 0) return this;
+
+        if (this.exponent % 2 !== 0) {
+            this.coefficient = Math.sqrt(this.coefficient * 10);
+            this.exponent = (this.exponent - 1) / 2;
+        } else {
+            this.coefficient = Math.sqrt(this.coefficient);
+            this.exponent = this.exponent / 2;
+        }
+
+        return this;
     }
 
     /**
-     * Returns `log10(this)` as a plain JavaScript `number`.
+     * Returns ∛this in-place.
      *
-     * Because the number is stored as `c * 10^e`, this is computed exactly as
-     * `log10(c) + e` - no precision loss from the exponent.
-     *
-     * @example
-     * new ArbitraryNumber(1, 6).log10();    // 6
-     * new ArbitraryNumber(1.5, 3).log10();  // log10(1.5) + 3  ~ 3.176
+     * **Mutates `this`. Returns `this`.**
+     */
+    public cbrt(): this {
+        if (this.coefficient === 0) return this;
+
+        const rem = ((this.exponent % 3) + 3) % 3;
+        const baseExp = (this.exponent - rem) / 3;
+
+        if (rem === 0) {
+            this.coefficient = Math.cbrt(this.coefficient);
+            this.exponent = baseExp;
+        } else if (rem === 1) {
+            this.coefficient = Math.cbrt(this.coefficient * 10);
+            this.exponent = baseExp;
+        } else {
+            this.coefficient = Math.cbrt(this.coefficient * 100);
+            this.exponent = baseExp;
+        }
+
+        return this;
+    }
+
+    /**
+     * Returns `log10(this)` as a plain `number`.
      *
      * @throws `"Logarithm of zero is undefined"` when this is zero.
      * @throws `"Logarithm of a negative number is undefined"` when this is negative.
@@ -867,7 +962,6 @@ export class ArbitraryNumber implements NormalizedNumber {
         if (this.coefficient === 0) {
             throw new ArbitraryNumberDomainError("Logarithm of zero is undefined", { value: 0 });
         }
-
         if (this.coefficient < 0) {
             throw new ArbitraryNumberDomainError("Logarithm of a negative number is undefined", { value: this.toNumber() });
         }
@@ -876,67 +970,10 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns √this.
+     * Returns `log_base(this)` as a plain `number`.
      *
-     * Computed as pure coefficient math - no `Math.log10` call. Cost: one `Math.sqrt`.
-     * For even exponents: `sqrt(c) * 10^(e/2)`.
-     * For odd exponents: `sqrt(c * 10) * 10^((e-1)/2)`.
-     *
-     * @throws `"Square root of negative number"` when this is negative.
-     * @example
-     * new ArbitraryNumber(4, 0).sqrt();   // 2
-     * new ArbitraryNumber(1, 4).sqrt();   // 1*10^2  (= 100)
-     */
-    public sqrt(): ArbitraryNumber {
-        if (this.coefficient < 0) throw new ArbitraryNumberDomainError("Square root of negative number", { value: this.toNumber() });
-        if (this.coefficient === 0) return ArbitraryNumber.Zero;
-        if (this.exponent % 2 !== 0) {
-            return ArbitraryNumber.createNormalized(Math.sqrt(this.coefficient * 10), (this.exponent - 1) / 2);
-        }
-
-        return ArbitraryNumber.createNormalized(Math.sqrt(this.coefficient), this.exponent / 2);
-    }
-
-    /**
-     * Returns the cube root of this number: `∛this`.
-     *
-     * Computed without `Math.log10`. For exponents divisible by 3: `cbrt(c) * 10^(e/3)`.
-     * For remainder 1: `cbrt(c * 10) * 10^((e-1)/3)`.
-     * For remainder 2: `cbrt(c * 100) * 10^((e-2)/3)`.
-     *
-     * Supports negative numbers (cube root of a negative is negative).
-     *
-     * @example
-     * new ArbitraryNumber(8, 0).cbrt();   // 2
-     * new ArbitraryNumber(1, 9).cbrt();   // 1*10^3  (= 1,000)
-     * new ArbitraryNumber(-8, 0).cbrt();  // -2
-     */
-    public cbrt(): ArbitraryNumber {
-        if (this.coefficient === 0) return ArbitraryNumber.Zero;
-
-        const rem = ((this.exponent % 3) + 3) % 3; // ensure non-negative remainder
-        const baseExp = (this.exponent - rem) / 3;
-
-        if (rem === 0) return ArbitraryNumber.createNormalized(Math.cbrt(this.coefficient), baseExp);
-        if (rem === 1) return ArbitraryNumber.createNormalized(Math.cbrt(this.coefficient * 10), baseExp);
-
-        return ArbitraryNumber.createNormalized(Math.cbrt(this.coefficient * 100), baseExp);
-    }
-
-    /**
-     * Returns `log_base(this)` as a plain JavaScript `number`.
-     *
-     * Computed as `log10(this) / log10(base)`. The numerator is exact due to the
-     * stored `coefficient × 10^exponent` form.
-     *
-     * @param base - The logarithm base. Must be positive and not 1.
-     * @throws `"Logarithm of zero is undefined"` when this is zero.
-     * @throws `"Logarithm of a negative number is undefined"` when this is negative.
+     * @param base - Must be positive and not 1.
      * @throws `"Logarithm base must be positive and not 1"` for invalid base.
-     *
-     * @example
-     * new ArbitraryNumber(8, 0).log(2);    // 3
-     * new ArbitraryNumber(1, 6).log(10);   // 6
      */
     public log(base: number): number {
         if (base <= 0 || base === 1 || !isFinite(base)) {
@@ -947,29 +984,14 @@ export class ArbitraryNumber implements NormalizedNumber {
     }
 
     /**
-     * Returns `ln(this)` — the natural logarithm — as a plain JavaScript `number`.
-     *
-     * Computed as `log10(this) / log10(e)`.
-     *
-     * @throws `"Logarithm of zero is undefined"` when this is zero.
-     * @throws `"Logarithm of a negative number is undefined"` when this is negative.
-     *
-     * @example
-     * new ArbitraryNumber(1, 0).ln();  // 0
+     * Returns `ln(this)` as a plain `number`.
      */
     public ln(): number {
         return this.log10() / Math.LOG10E;
     }
 
     /**
-     * Returns `10^n` as an `ArbitraryNumber`, where `n` is a plain JS `number`.
-     *
-     * This is the inverse of {@link log10}. Useful for converting a log10 result
-     * back into an `ArbitraryNumber`.
-     *
-     * @example
-     * ArbitraryNumber.exp10(6);    // 1*10^6  (= 1,000,000)
-     * ArbitraryNumber.exp10(3.5);  // 10^3.5 ≈ 3162.3
+     * Returns `10^n` as a new `ArbitraryNumber`.
      *
      * @throws `"ArbitraryNumber.exp10: n must be finite"` for non-finite `n`.
      */
@@ -980,80 +1002,148 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         const intPart = Math.floor(n);
         const fracPart = n - intPart;
-        const c = Math.pow(10, fracPart);
-        return ArbitraryNumber.createNormalized(c, intPart);
+        return ArbitraryNumber.unsafe(Math.pow(10, fracPart), intPart);
     }
 
+    // ── Comparisons (read-only) ────────────────────────────────────────────────
+
     /**
-     * Returns the nearest integer value (rounds half-up).
+     * Compares this number to `other`.
      *
-     * Numbers with `exponent >= PrecisionCutoff` are already integers at that scale
-     * and are returned unchanged.
-     *
-     * @example
-     * new ArbitraryNumber(1.5, 0).round();  // 2
-     * new ArbitraryNumber(1.4, 0).round();  // 1
-     * new ArbitraryNumber(-1.5, 0).round(); // -1 (half-up toward positive infinity)
+     * @returns `1` if `this > other`, `-1` if `this < other`, `0` if equal.
      */
-    public round(): ArbitraryNumber {
-        if (this.coefficient === 0) return ArbitraryNumber.Zero;
-        if (this.exponent >= ArbitraryNumber.PrecisionCutoff) return this;
+    public compareTo(other: ArbitraryNumber): number {
+        const thisNegative = this.coefficient < 0;
+        const otherNegative = other.coefficient < 0;
 
-        if (this.exponent < 0) {
-            if (this.exponent <= -2) return ArbitraryNumber.Zero;
-
-            const rounded = Math.round(this.coefficient * 0.1);
-            return rounded === 0
-                ? ArbitraryNumber.Zero
-                : new ArbitraryNumber(rounded, 0);
+        if (thisNegative !== otherNegative) {
+            return thisNegative ? -1 : 1;
         }
 
-        return new ArbitraryNumber(Math.round(this.coefficient * pow10(this.exponent)), 0);
+        if (this.exponent !== other.exponent) {
+            if (this.coefficient === 0) return otherNegative ? 1 : -1;
+            if (other.coefficient === 0) return thisNegative ? -1 : 1;
+
+            const thisExpHigher = this.exponent > other.exponent;
+            return thisNegative
+                ? (thisExpHigher ? -1 : 1)
+                : (thisExpHigher ? 1 : -1);
+        }
+
+        if (this.coefficient !== other.coefficient) {
+            return this.coefficient > other.coefficient ? 1 : -1;
+        }
+
+        return 0;
+    }
+
+    /** Returns `true` if `this > other`. */
+    public greaterThan(other: ArbitraryNumber): boolean { return this.compareTo(other) > 0; }
+    /** Returns `true` if `this < other`. */
+    public lessThan(other: ArbitraryNumber): boolean { return this.compareTo(other) < 0; }
+    /** Returns `true` if `this >= other`. */
+    public greaterThanOrEqual(other: ArbitraryNumber): boolean { return this.compareTo(other) >= 0; }
+    /** Returns `true` if `this <= other`. */
+    public lessThanOrEqual(other: ArbitraryNumber): boolean { return this.compareTo(other) <= 0; }
+    /** Returns `true` if `this === other` in value. */
+    public equals(other: ArbitraryNumber): boolean { return this.compareTo(other) === 0; }
+
+    // ── Clamp / min / max (static, allocate) ──────────────────────────────────
+
+    /**
+     * Clamps `value` to the inclusive range `[min, max]`. Returns one of the three
+     * inputs (no allocation).
+     */
+    public static clamp(value: ArbitraryNumber, min: ArbitraryNumber, max: ArbitraryNumber): ArbitraryNumber {
+        if (value.lessThan(min)) return min;
+        if (value.greaterThan(max)) return max;
+
+        return value;
+    }
+
+    /** Returns the smaller of `a` and `b`. */
+    public static min(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.lessThan(b) ? a : b;
+    }
+
+    /** Returns the larger of `a` and `b`. */
+    public static max(a: ArbitraryNumber, b: ArbitraryNumber): ArbitraryNumber {
+        return a.greaterThan(b) ? a : b;
     }
 
     /**
-     * Returns the integer part of this number, truncating toward zero.
+     * Linear interpolation: `a + (b - a) * t`.
      *
-     * Unlike `floor()`, which rounds toward −∞, `trunc()` always rounds toward 0:
-     * - `trunc(1.7)  = 1`  (same as floor)
-     * - `trunc(-1.7) = -1` (different from floor, which gives -2)
-     *
-     * Numbers with `exponent >= PrecisionCutoff` are already integers and returned unchanged.
-     *
-     * @example
-     * new ArbitraryNumber(1.7, 0).trunc();   //  1
-     * new ArbitraryNumber(-1.7, 0).trunc();  // -1
+     * Returns `a` unchanged when `t === 0`, `b` unchanged when `t === 1`.
+     * All other values of `t` allocate and return a fresh instance.
      */
-    public trunc(): ArbitraryNumber {
-        if (this.coefficient === 0) return ArbitraryNumber.Zero;
-        if (this.exponent >= ArbitraryNumber.PrecisionCutoff) return this;
-        if (this.exponent < 0) return ArbitraryNumber.Zero;
+    public static lerp(a: ArbitraryNumber, b: ArbitraryNumber, t: number): ArbitraryNumber {
+        if (t === 0) return a;
+        if (t === 1) return b;
 
-        return new ArbitraryNumber(Math.trunc(this.coefficient * pow10(this.exponent)), 0);
+        return a.clone().add(b.clone().sub(a).mul(ArbitraryNumber.from(t)));
+    }
+
+    /**
+     * Runs `fn` with `defaults.scaleCutoff` temporarily set to `cutoff`, then restores it.
+     */
+    public static withPrecision<T>(cutoff: number, fn: () => T): T {
+        const prev = ArbitraryNumber.defaults.scaleCutoff;
+        ArbitraryNumber.defaults.scaleCutoff = cutoff;
+        try {
+            return fn();
+        } finally {
+            ArbitraryNumber.defaults.scaleCutoff = prev;
+        }
+    }
+
+    // ── Predicates (read-only) ─────────────────────────────────────────────────
+
+    /** Returns `true` when this number is zero. */
+    public isZero(): boolean { return this.coefficient === 0; }
+    /** Returns `true` when this number is strictly positive. */
+    public isPositive(): boolean { return this.coefficient > 0; }
+    /** Returns `true` when this number is strictly negative. */
+    public isNegative(): boolean { return this.coefficient < 0; }
+
+    /**
+     * Returns `true` when this number has no fractional part.
+     * Numbers with `exponent >= scaleCutoff` are always considered integers.
+     */
+    public isInteger(): boolean {
+        if (this.coefficient === 0) return true;
+        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return true;
+        if (this.exponent < 0) return false;
+
+        return Number.isInteger(this.coefficient * pow10(this.exponent));
     }
 
     /**
      * Returns `1` if positive, `-1` if negative, `0` if zero.
-     *
-     * @example
-     * new ArbitraryNumber(1.5, 3).sign();  // 1
-     * new ArbitraryNumber(-1.5, 3).sign(); // -1
-     * ArbitraryNumber.Zero.sign();         // 0
      */
     public sign(): Signum {
         return Math.sign(this.coefficient) as Signum;
     }
 
+    // ── Freeze ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns a `FrozenArbitraryNumber` wrapping the same value.
+     *
+     * Mutating methods on the frozen instance throw `ArbitraryNumberMutationError`.
+     * Call `.clone()` on the frozen instance to get a fresh, mutable copy.
+     */
+    public freeze(): FrozenArbitraryNumber {
+        return new FrozenArbitraryNumber(this.coefficient, this.exponent);
+    }
+
+    // ── Serialization ──────────────────────────────────────────────────────────
+
     /**
      * Converts to a plain JavaScript `number`.
      *
-     * Precision is limited to float64 (~15 significant digits).
-     * Returns `Infinity` for exponents beyond the float64 range (>=308).
-     * Returns `0` for exponents below the float64 range (<=-324).
-     *
-     * @example
-     * new ArbitraryNumber(1.5, 3).toNumber();  // 1500
-     * new ArbitraryNumber(1, 400).toNumber();  // Infinity
+     * Returns `Infinity` for exponents beyond float64 range (>=308).
+     * Returns `0` for exponents below float64 range (<=-324).
      */
     public toNumber(): number {
         return this.coefficient * pow10(this.exponent);
@@ -1062,39 +1152,27 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Returns a stable, minimal JSON representation: `{ c: number, e: number }`.
      *
-     * The keys `c` and `e` are intentionally short to keep save-game blobs small.
-     * Reconstruct via {@link ArbitraryNumber.fromJSON}.
-     *
      * Round-trip guarantee: `ArbitraryNumber.fromJSON(x.toJSON()).equals(x)` is always `true`.
-     *
-     * @example
-     * JSON.stringify(an(1.5, 6)); // '{"c":1.5,"e":6}'
      */
     public toJSON(): ArbitraryNumberJson {
         return { c: this.coefficient, e: this.exponent };
     }
 
     /**
-     * Returns a raw string representation: `"<coefficient>|<exponent>"`.
+     * Returns a compact string representation: `"<coefficient>|<exponent>"`.
      *
-     * Useful for compact textual serialization. Reconstruct via {@link ArbitraryNumber.parse}.
+     * Shorter than JSON for save-game serialisation. Reconstruct via `ArbitraryNumber.parse`.
      *
      * @example
-     * an(1.5, 3).toRaw();  // "1.5|3"
-     * an(-2, 6).toRaw();   // "-2|6"
+     * an(1500).toRawString() // "1.5|3"
      */
-    public toRaw(): string {
+    public toRawString(): string {
         return `${this.coefficient}|${this.exponent}`;
     }
 
     /**
      * Reconstructs an `ArbitraryNumber` from a `toJSON()` blob.
      *
-     * @example
-     * const n = an(1.5, 6);
-     * ArbitraryNumber.fromJSON(n.toJSON()).equals(n); // true
-     *
-     * @param obj - Object with numeric `c` (coefficient) and `e` (exponent) fields.
      * @throws `ArbitraryNumberInputError` when the object shape is invalid or values are non-finite.
      */
     public static fromJSON(obj: unknown): ArbitraryNumber {
@@ -1121,26 +1199,18 @@ export class ArbitraryNumber implements NormalizedNumber {
             throw new ArbitraryNumberInputError("ArbitraryNumber.fromJSON: e must be finite", e);
         }
 
-        // c and e come from toJSON() which stores already-normalised values, so use
-        // createNormalized for the zero-cost fast path. Still call normalizeFrom for
-        // externally-constructed blobs where c may not be normalised.
-        return ArbitraryNumber.normalizeFrom(c, e);
+        return ArbitraryNumber._normalizeNew(c, e);
     }
 
     /**
      * Parses a string into an `ArbitraryNumber`.
      *
      * Accepted formats:
-     * - Raw pipe format (exact round-trip): `"1.5|3"`, `"-2.5|-6"`
-     * - Standard scientific notation: `"1.5e+3"`, `"1.5e-3"`, `"1.5E3"`, `"1.5e3"`
+     * - Raw pipe format: `"1.5|3"`, `"-2.5|-6"`
+     * - Scientific notation: `"1.5e+3"`, `"1.5E3"`
      * - Plain decimal: `"1500"`, `"-0.003"`, `"0"`
      *
-     * @example
-     * ArbitraryNumber.parse("1.5|3");    // same as an(1.5, 3)
-     * ArbitraryNumber.parse("1.5e+3");   // same as ArbitraryNumber.from(1500)
-     * ArbitraryNumber.parse("1500");     // same as ArbitraryNumber.from(1500)
-     *
-     * @throws `ArbitraryNumberInputError` when the string cannot be parsed or produces a non-finite value.
+     * @throws `ArbitraryNumberInputError` for invalid or non-finite input.
      */
     public static parse(s: string): ArbitraryNumber {
         if (typeof s !== "string" || s.trim() === "") {
@@ -1149,7 +1219,6 @@ export class ArbitraryNumber implements NormalizedNumber {
 
         const trimmed = s.trim();
 
-        // Raw pipe format: "coefficient|exponent"
         const pipeIdx = trimmed.indexOf("|");
         if (pipeIdx !== -1) {
             const cStr = trimmed.slice(0, pipeIdx);
@@ -1160,10 +1229,9 @@ export class ArbitraryNumber implements NormalizedNumber {
                 throw new ArbitraryNumberInputError("ArbitraryNumber.parse: invalid pipe format", s);
             }
 
-            return ArbitraryNumber.normalizeFrom(c, e);
+            return ArbitraryNumber._normalizeNew(c, e);
         }
 
-        // Scientific or plain decimal — delegate to Number()
         const n = Number(trimmed);
         if (!isFinite(n)) {
             throw new ArbitraryNumberInputError("ArbitraryNumber.parse: value is not finite", s);
@@ -1172,41 +1240,17 @@ export class ArbitraryNumber implements NormalizedNumber {
         return new ArbitraryNumber(n, 0);
     }
 
-    /** Returns `true` when this number is zero. */
-    public isZero(): boolean { return this.coefficient === 0; }
-
-    /** Returns `true` when this number is strictly positive. */
-    public isPositive(): boolean { return this.coefficient > 0; }
-
-    /** Returns `true` when this number is strictly negative. */
-    public isNegative(): boolean { return this.coefficient < 0; }
-
-    /**
-     * Returns `true` when this number has no fractional part.
-     * Numbers with `exponent >= PrecisionCutoff` are always considered integers.
-     */
-    public isInteger(): boolean {
-        if (this.coefficient === 0) return true;
-        if (this.exponent >= ArbitraryNumber.PrecisionCutoff) return true;
-        if (this.exponent < 0) return false;
-
-        return Number.isInteger(this.coefficient * pow10(this.exponent));
-    }
+    // ── String coercion ────────────────────────────────────────────────────────
 
     /**
      * Allows implicit coercion via `+an(1500)` (returns `toNumber()`) and
      * template literals / string concatenation (returns `toString()`).
-     *
-     * `hint === "number"` → `toNumber()`; all other hints → `toString()`.
      */
     public [Symbol.toPrimitive](hint: string): number | string {
         return hint === "number" ? this.toNumber() : this.toString();
     }
 
-    /**
-     * Custom Node.js inspect output so `console.log(an(1500))` renders `"1.50e+3"`
-     * instead of the raw object representation.
-     */
+    /** Custom Node.js inspect output so `console.log(an(1500))` renders `"1.50e+3"`. */
     public [Symbol.for("nodejs.util.inspect.custom")](): string {
         return this.toString();
     }
@@ -1214,18 +1258,72 @@ export class ArbitraryNumber implements NormalizedNumber {
     /**
      * Formats this number as a string using the given notation plugin.
      *
-     * Defaults to {@link scientificNotation} when no plugin is provided.
-     * `decimals` controls the number of decimal places passed to the plugin and defaults to `2`.
-     *
-     * @example
-     * new ArbitraryNumber(1.5, 3).toString();                  // "1.50e+3"
-     * new ArbitraryNumber(1.5, 3).toString(unitNotation);       // "1.50 K"
-     * new ArbitraryNumber(1.5, 3).toString(unitNotation, 4);    // "1.5000 K"
-     *
-     * @param notation - The formatting plugin to use.
-     * @param decimals - Number of decimal places to render. Defaults to `2`.
+     * Defaults to `scientificNotation` when no plugin is provided.
+     * `decimals` controls decimal places and defaults to `defaults.notationDecimals`.
      */
-    public toString(notation: NotationPlugin = scientificNotation, decimals = 2): string {
+    public toString(
+        notation: NotationPlugin = scientificNotation,
+        decimals = ArbitraryNumber.defaults.notationDecimals,
+    ): string {
         return notation.format(this.coefficient, this.exponent, decimals);
     }
 }
+
+// ── FrozenArbitraryNumber ──────────────────────────────────────────────────────
+
+import { ArbitraryNumberMutationError } from "../errors";
+
+/**
+ * An immutable wrapper around `ArbitraryNumber`.
+ *
+ * Created via `number.freeze()`. All mutating methods throw `ArbitraryNumberMutationError`.
+ * Call `.clone()` to get a fresh, mutable `ArbitraryNumber`.
+ *
+ * @example
+ * const frozen = gold.freeze();
+ * frozen.add(drop);  // throws ArbitraryNumberMutationError
+ * const mutable = frozen.clone(); // fresh mutable copy
+ */
+export class FrozenArbitraryNumber extends ArbitraryNumber {
+    /** @internal */
+    public constructor(coefficient: number, exponent: number) {
+        super(0, 0);
+        // bypass normalization — values come from a valid ArbitraryNumber
+        this.coefficient = coefficient;
+        this.exponent = exponent;
+    }
+
+    private _throwMutation(method: string): never {
+        throw new ArbitraryNumberMutationError(
+            `Cannot call mutating method '${method}' on a frozen ArbitraryNumber`,
+        );
+    }
+
+    // Every public mutating method on ArbitraryNumber must have an override here.
+    // If you add a new mutating method above, add a matching override below.
+    public override add(_other: ArbitraryNumber): never { this._throwMutation("add"); }
+    public override sub(_other: ArbitraryNumber): never { this._throwMutation("sub"); }
+    public override mul(_other: ArbitraryNumber): never { this._throwMutation("mul"); }
+    public override div(_other: ArbitraryNumber): never { this._throwMutation("div"); }
+    public override negate(): never { this._throwMutation("negate"); }
+    public override abs(): never { this._throwMutation("abs"); }
+    public override pow(_n: number): never { this._throwMutation("pow"); }
+    public override mulAdd(_m: ArbitraryNumber, _a: ArbitraryNumber): never { this._throwMutation("mulAdd"); }
+    public override addMul(_a: ArbitraryNumber, _m: ArbitraryNumber): never { this._throwMutation("addMul"); }
+    public override mulSub(_m: ArbitraryNumber, _s: ArbitraryNumber): never { this._throwMutation("mulSub"); }
+    public override subMul(_s: ArbitraryNumber, _m: ArbitraryNumber): never { this._throwMutation("subMul"); }
+    public override divAdd(_d: ArbitraryNumber, _a: ArbitraryNumber): never { this._throwMutation("divAdd"); }
+    public override mulDiv(_m: ArbitraryNumber, _d: ArbitraryNumber): never { this._throwMutation("mulDiv"); }
+    public override floor(): never { this._throwMutation("floor"); }
+    public override ceil(): never { this._throwMutation("ceil"); }
+    public override round(): never { this._throwMutation("round"); }
+    public override trunc(): never { this._throwMutation("trunc"); }
+    public override sqrt(): never { this._throwMutation("sqrt"); }
+    public override cbrt(): never { this._throwMutation("cbrt"); }
+}
+
+// Replace bootstrap instances with proper FrozenArbitraryNumber singletons.
+// `as any` bypasses the `readonly` modifier — this is the one-time initialiser.
+(ArbitraryNumber as any).Zero = new FrozenArbitraryNumber(0, 0);
+(ArbitraryNumber as any).One  = new FrozenArbitraryNumber(1, 0);
+(ArbitraryNumber as any).Ten  = new FrozenArbitraryNumber(1, 1);

@@ -70,7 +70,7 @@ describe("mulDiv — fused multiply-divide", () => {
         });
 
         it("this = zero returns zero", () => {
-            const result = ArbitraryNumber.Zero.mulDiv(num(5), num(2));
+            const result = num(0).mulDiv(num(5), num(2));
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
 

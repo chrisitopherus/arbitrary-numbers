@@ -4,6 +4,12 @@
  * Simulates real idle/incremental game workloads to show where fused operations
  * provide meaningful wins over the naive chained approach.
  *
+ * Because ArbitraryNumber v2 mutates in-place, shared operands (multiplier,
+ * boost, etc.) are never passed as `other` to a mutating method that would
+ * corrupt them. Each bench uses fresh `value` instances per call and passes
+ * stable read-only seed values as the argument (which are only read, not
+ * mutated, by the called method).
+ *
  * Patterns
  * ────────
  * income_aggregation   sumArray(50 sources) vs chained .add() reduce
@@ -17,23 +23,27 @@ import { ArbitraryNumber } from "../src/core/ArbitraryNumber";
 
 // ─── Income aggregation ────────────────────────────────────────────────────
 // A typical idle game sums many income sources every tick.
+// sumArray reads operands without mutating them, so we can reuse the seed.
 
-const incomeSources50 = Array.from({ length: 50 }, (_, i) =>
+const seedSources50 = Array.from({ length: 50 }, (_, i) =>
     new ArbitraryNumber(1.0 + (i % 9) * 0.1, i % 8));
 
 summary(() => {
     group("income aggregation — 50 sources per tick", () => {
-        bench("chained  .reduce(.add)", () =>
+        bench("chained  .reduce(.add)", () => {
+            const sources = seedSources50.map(n => n.clone());
             do_not_optimize(
-                incomeSources50.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero)
-            ));
+                sources.reduce((acc, v) => acc.add(v), new ArbitraryNumber(0, 0))
+            );
+        });
         bench("sumArray([50])        ", () =>
-            do_not_optimize(ArbitraryNumber.sumArray(incomeSources50)));
+            do_not_optimize(ArbitraryNumber.sumArray(seedSources50)));
     });
 });
 
 // ─── Prestige loop ─────────────────────────────────────────────────────────
 // Prestige: value = value × multiplier + boost, repeated many times.
+// multiplier and boost are passed as `other` — mul/add only read them.
 
 summary(() => {
     const prestigeMultiplier = new ArbitraryNumber(1.1, 0); // 1.1×
@@ -43,14 +53,14 @@ summary(() => {
         bench("chained  .mul().add() × 100", () => {
             let value = new ArbitraryNumber(1.0, 9);
             for (let i = 0; i < 100; i++) {
-                value = value.mul(prestigeMultiplier).add(prestigeBoost);
+                value.mul(prestigeMultiplier).add(prestigeBoost);
             }
             do_not_optimize(value);
         });
         bench("fused    .mulAdd()    × 100", () => {
             let value = new ArbitraryNumber(1.0, 9);
             for (let i = 0; i < 100; i++) {
-                value = value.mulAdd(prestigeMultiplier, prestigeBoost);
+                value.mulAdd(prestigeMultiplier, prestigeBoost);
             }
             do_not_optimize(value);
         });
@@ -68,14 +78,14 @@ summary(() => {
         bench("chained  .add().mul() × 100", () => {
             let value = new ArbitraryNumber(1.0, 6);
             for (let i = 0; i < 100; i++) {
-                value = value.add(upgradeBonus).mul(upgradeMultiplier);
+                value.add(upgradeBonus).mul(upgradeMultiplier);
             }
             do_not_optimize(value);
         });
         bench("fused    .addMul()    × 100", () => {
             let value = new ArbitraryNumber(1.0, 6);
             for (let i = 0; i < 100; i++) {
-                value = value.addMul(upgradeBonus, upgradeMultiplier);
+                value.addMul(upgradeBonus, upgradeMultiplier);
             }
             do_not_optimize(value);
         });
@@ -83,20 +93,24 @@ summary(() => {
 });
 
 // ─── Full game tick simulation ─────────────────────────────────────────────
-// gold += gps × mult × dt
-// Fused form: (gps × mult).mulAdd(dt, gold) = (gps × mult × dt) + gold ✓
+// gold += gps × mult × dt  (mutable in-place chaining)
+// Fused form: gps.clone().mul(mult).mulAdd(dt, gold) = gold + gps×mult×dt
 
 summary(() => {
-    const gold       = new ArbitraryNumber(1.0,   9);   // 1e9
-    const goldPerSec = new ArbitraryNumber(1.5,   3);   // 1,500
-    const multiplier = new ArbitraryNumber(2.0,   2);   // 200
-    const dt         = new ArbitraryNumber(1.667, -2);  // ≈ 0.01667 (60fps Δt)
+    const seedGold     = new ArbitraryNumber(1.0,   9);  // 1e9
+    const goldPerSec   = new ArbitraryNumber(1.5,   3);  // 1,500
+    const multiplier   = new ArbitraryNumber(2.0,   2);  // 200
+    const dt           = new ArbitraryNumber(1.667, -2); // ≈ 0.01667 (60fps Δt)
 
     group("idle tick — gold += gps × mult × dt", () => {
-        bench("chained  .mul().mul().add()     ", () =>
-            do_not_optimize(gold.add(goldPerSec.mul(multiplier).mul(dt))));
-        bench("fused    .mul().mulAdd(dt, gold)", () =>
-            do_not_optimize(goldPerSec.mul(multiplier).mulAdd(dt, gold)));
+        bench("chained  gold.add(gps.clone().mul(mult).mul(dt))", () => {
+            const gold = seedGold.clone();
+            do_not_optimize(gold.add(goldPerSec.clone().mul(multiplier).mul(dt)));
+        });
+        bench("fused    gps.clone().mul(mult).mulAdd(dt, gold)  ", () => {
+            const gold = seedGold.clone();
+            do_not_optimize(goldPerSec.clone().mul(multiplier).mulAdd(dt, gold));
+        });
     });
 });
 

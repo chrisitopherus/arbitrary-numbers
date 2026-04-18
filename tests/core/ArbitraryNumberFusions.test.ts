@@ -96,7 +96,7 @@ describe("mulAdd — fused multiply-add", () => {
 
     describe("zero operand edge cases", () => {
         it("this=0: returns addend unchanged", () => {
-            const result = ArbitraryNumber.Zero.mulAdd(num(5), num(10));
+            const result = num(0).mulAdd(num(5), num(10));
             expect(result.equals(num(10))).toBe(true);
         });
 
@@ -111,7 +111,7 @@ describe("mulAdd — fused multiply-add", () => {
         });
 
         it("all zero: returns Zero", () => {
-            const result = ArbitraryNumber.Zero.mulAdd(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
+            const result = num(0).mulAdd(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
     });
@@ -127,19 +127,15 @@ describe("mulAdd — fused multiply-add", () => {
         });
 
         it("addend NOT negligible (diff = 14 < cutoff): both contribute", () => {
-            const a = raw(1.0, 18);
-            const mult = ArbitraryNumber.One;
-            const addend = raw(1.0, 4);
-            const result = a.mulAdd(mult, addend);
-            expect(result.greaterThan(a)).toBe(true);
+            // a * 1 + addend; diff between exp 18 and 4 = 14 < 15, so addend contributes
+            const result = raw(1.0, 18).mulAdd(num(1), raw(1.0, 4));
+            expect(result.greaterThan(raw(1.0, 18))).toBe(true);
         });
 
         it("diff = 15 exactly (at cutoff): both contribute", () => {
-            const a = raw(1.0, 19);
-            const mult = ArbitraryNumber.One;
-            const addend = raw(1.0, 4);
-            const result = a.mulAdd(mult, addend);
-            expect(result.greaterThan(a)).toBe(true);
+            // diff = 19 - 4 = 15 exactly → included
+            const result = raw(1.0, 19).mulAdd(num(1), raw(1.0, 4));
+            expect(result.greaterThan(raw(1.0, 19))).toBe(true);
         });
     });
 });
@@ -214,7 +210,7 @@ describe("addMul — fused add-multiply", () => {
         });
 
         it("this=0: (0 + addend) × mult = addend × mult", () => {
-            const result = ArbitraryNumber.Zero.addMul(num(5), num(3));
+            const result = num(0).addMul(num(5), num(3));
             const expected = num(5).mul(num(3));
             expect(approxEqual(result, expected)).toBe(true);
         });
@@ -226,12 +222,12 @@ describe("addMul — fused add-multiply", () => {
         });
 
         it("this=0 and addend=0: returns Zero", () => {
-            const result = ArbitraryNumber.Zero.addMul(ArbitraryNumber.Zero, num(5));
+            const result = num(0).addMul(ArbitraryNumber.Zero, num(5));
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
 
         it("all zero: returns Zero", () => {
-            const result = ArbitraryNumber.Zero.addMul(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
+            const result = num(0).addMul(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
     });
@@ -308,7 +304,7 @@ describe("mulSub — fused multiply-subtract", () => {
 
     describe("zero operand edge cases", () => {
         it("this=0: returns −subtrahend", () => {
-            const result = ArbitraryNumber.Zero.mulSub(num(5), num(10));
+            const result = num(0).mulSub(num(5), num(10));
             const expected = num(-10);
             expect(approxEqual(result, expected)).toBe(true);
         });
@@ -324,7 +320,7 @@ describe("mulSub — fused multiply-subtract", () => {
         });
 
         it("all zero: returns Zero", () => {
-            const result = ArbitraryNumber.Zero.mulSub(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
+            const result = num(0).mulSub(ArbitraryNumber.Zero, ArbitraryNumber.Zero);
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
     });
@@ -384,7 +380,7 @@ describe("subMul — fused subtract-multiply", () => {
         });
 
         it("this=0: (0 − sub) × mult = −sub × mult", () => {
-            const result = ArbitraryNumber.Zero.subMul(num(5), num(3));
+            const result = num(0).subMul(num(5), num(3));
             const expected = num(-5).mul(num(3));
             expect(approxEqual(result, expected)).toBe(true);
         });
@@ -395,7 +391,7 @@ describe("subMul — fused subtract-multiply", () => {
         });
 
         it("this=0 and subtrahend=0: returns Zero", () => {
-            const result = ArbitraryNumber.Zero.subMul(ArbitraryNumber.Zero, num(5));
+            const result = num(0).subMul(ArbitraryNumber.Zero, num(5));
             expect(result.equals(ArbitraryNumber.Zero)).toBe(true);
         });
     });
@@ -451,7 +447,7 @@ describe("divAdd — fused divide-add", () => {
 
     describe("zero operand edge cases", () => {
         it("this=0: returns addend", () => {
-            const result = ArbitraryNumber.Zero.divAdd(num(5), num(10));
+            const result = num(0).divAdd(num(5), num(10));
             expect(result.equals(num(10))).toBe(true);
         });
 
@@ -504,7 +500,7 @@ describe("sumArray — batch addition", () => {
         it("50 elements all equal to 1.0e6", () => {
             const arr = Array.from({ length: 50 }, () => raw(1.0, 6));
             const sumResult = ArbitraryNumber.sumArray(arr);
-            const chainResult = arr.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
+            const chainResult = arr.reduce((acc, v) => acc.add(v), num(0));
             expect(approxEqual(sumResult, chainResult)).toBe(true);
         });
 
@@ -515,7 +511,7 @@ describe("sumArray — batch addition", () => {
             }
 
             const sumResult = ArbitraryNumber.sumArray(arr);
-            const chainResult = arr.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
+            const chainResult = arr.reduce((acc, v) => acc.add(v), num(0));
             expect(approxEqual(sumResult, chainResult, 1e-8)).toBe(true);
         });
 
@@ -532,7 +528,7 @@ describe("sumArray — batch addition", () => {
         it("mixed positive and negative: [3000, -1000, 500] = 2500", () => {
             const arr = [num(3000), num(-1000), num(500)];
             const sumResult = ArbitraryNumber.sumArray(arr);
-            const chainResult = arr.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
+            const chainResult = arr.reduce((acc, v) => acc.add(v), num(0));
             expect(approxEqual(sumResult, chainResult)).toBe(true);
         });
     });
@@ -571,7 +567,7 @@ describe("sumArray — batch addition", () => {
             }
 
             const sumResult = ArbitraryNumber.sumArray(sources);
-            const chainResult = sources.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero);
+            const chainResult = sources.reduce((acc, v) => acc.add(v), num(0));
             expect(approxEqual(sumResult, chainResult, 1e-8)).toBe(true);
         });
 

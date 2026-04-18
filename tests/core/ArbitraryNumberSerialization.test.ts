@@ -137,28 +137,28 @@ describe("toJSON / fromJSON round-trip", () => {
 });
 
 // ---------------------------------------------------------------------------
-// toRaw / parse (pipe format)
+// toRawString / parse (pipe format)
 // ---------------------------------------------------------------------------
 
-describe("toRaw", () => {
+describe("toRawString", () => {
     it("produces 'coefficient|exponent' string", () => {
-        expect(raw(1.5, 3).toRaw()).toBe("1.5|3");
+        expect(raw(1.5, 3).toRawString()).toBe("1.5|3");
     });
 
     it("zero", () => {
-        expect(ArbitraryNumber.Zero.toRaw()).toBe("0|0");
+        expect(ArbitraryNumber.Zero.toRawString()).toBe("0|0");
     });
 
     it("negative coefficient", () => {
-        expect(raw(-2.5, 6).toRaw()).toBe("-2.5|6");
+        expect(raw(-2.5, 6).toRawString()).toBe("-2.5|6");
     });
 
     it("negative exponent", () => {
-        expect(raw(1.5, -3).toRaw()).toBe("1.5|-3");
+        expect(raw(1.5, -3).toRawString()).toBe("1.5|-3");
     });
 
     it("both negative", () => {
-        expect(raw(-1.5, -3).toRaw()).toBe("-1.5|-3");
+        expect(raw(-1.5, -3).toRawString()).toBe("-1.5|-3");
     });
 });
 
@@ -282,7 +282,7 @@ describe("toRaw / parse round-trip", () => {
 
     for (const [label, n] of cases) {
         it(`round-trips: ${label}`, () => {
-            const restored = ArbitraryNumber.parse(n.toRaw());
+            const restored = ArbitraryNumber.parse(n.toRawString());
             expect(restored.equals(n)).toBe(true);
         });
     }

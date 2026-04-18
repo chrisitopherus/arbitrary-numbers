@@ -1,10 +1,12 @@
 // Core
-export { ArbitraryNumber } from "./core/ArbitraryNumber";
+export { ArbitraryNumber, FrozenArbitraryNumber } from "./core/ArbitraryNumber";
+export type { ArbitraryNumberDefaults } from "./core/ArbitraryNumber";
 
 // Errors
-export { ArbitraryNumberError, ArbitraryNumberInputError, ArbitraryNumberDomainError } from "./errors";
+export { ArbitraryNumberError, ArbitraryNumberInputError, ArbitraryNumberDomainError, ArbitraryNumberMutationError } from "./errors";
+
+// Helpers
 export { an } from "./core/an";
-export { AnChain, chain } from "./core/AnChain";
 export { AnFormula, formula } from "./core/AnFormula";
 
 // Plugins
@@ -18,15 +20,13 @@ export { CLASSIC_UNITS, COMPACT_UNITS } from "./constants/units";
 
 // Utilities
 export { ArbitraryNumberGuard } from "./utility/ArbitraryNumberGuard";
-export { ArbitraryNumberOps } from "./utility/ArbitraryNumberOps";
 export { ArbitraryNumberHelpers } from "./utility/ArbitraryNumberHelpers";
 
 // Short aliases
-export { ArbitraryNumberOps as ops } from "./utility/ArbitraryNumberOps";
 export { ArbitraryNumberGuard as guard } from "./utility/ArbitraryNumberGuard";
 export { ArbitraryNumberHelpers as helpers } from "./utility/ArbitraryNumberHelpers";
 
 // Types
 export type { ArbitraryNumberish, Maybe, Nullable, ArbitraryNumberJson } from "./types/utility";
-export type { AnFunction, NormalizedNumber, Signum, Mod3 } from "./types/core";
+export type { AnFunction, Signum, Mod3 } from "./types/core";
 export type { NotationPlugin, SuffixProvider, SuffixNotationPlugin, SuffixNotationPluginOptions, AlphabetNotationOptions, Unit, UnitArray, UnitNotationOptions } from "./types/plugin";
