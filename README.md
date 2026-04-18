@@ -746,10 +746,10 @@ Quick reference (Node 22.16, Intel i5-13600KF):
 
 | Operation | Time |
 |---|---|
-| `add` / `sub` (typical) | ~20-28 ns |
-| `mul` / `div` | ~10-11 ns |
-| Fused ops (`mulAdd`, `mulSub`, ...) | ~27-29 ns, 1.5-1.6x faster than chained |
-| `sumArray(50 items)` | ~200 ns, 8.4-8.7x faster than `.reduce` |
-| `compareTo` (same exponent) | ~0.6 ns |
-| `sqrt()` | ~10 ns |
-| `pow(0.5)` | ~7 ns |
+| `add` / `sub` (typical) | ~270-275 ns |
+| `mul` / `div` | ~250-255 ns |
+| Fused ops (`mulAdd`, `mulSub`, ...) | ~275 ns, ~1.9x faster than chained |
+| `sumArray(50 items)` | ~435 ns, ~31x faster than `.reduce` |
+| `compareTo` (same exponent) | ~3 ns |
+| `sqrt()` | ~252 ns |
+| `pow(0.5)` | ~20 ns |

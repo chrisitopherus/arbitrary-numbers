@@ -36,9 +36,8 @@ export class UnitNotation extends SuffixNotationBase {
         super({ separator: " ", ...options });
         this.units = options.units;
         this.fallback = options.fallback;
-        this.offsetFallback = options.offsetFallback !== false; // default true
+        this.offsetFallback = options.offsetFallback !== false;
 
-        // Compute last defined tier so fallback can be offset correctly.
         let last = 0;
         for (let i = options.units.length - 1; i >= 0; i--) {
             if (options.units[i] !== undefined) { last = i; break; }

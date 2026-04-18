@@ -26,14 +26,14 @@ export function pow10(n: number): number {
 }
 
 /**
- * Returns `10^n` for integer `n ∈ [0, 15]` — table lookup only, no branch to `Math.pow`.
+ * Returns `10^n`, preferring the lookup table for integer `n ∈ [0, 15]`.
  *
- * Use this at hot-path call sites where the caller can statically guarantee `n` is a
- * non-negative integer less than 16 (e.g. inside `add`/`sub` when `diff` is clamped by
- * `PrecisionCutoff ≤ 15`). Saves one conditional per call versus `pow10`.
+ * Use this at hot-path call sites where `n` is usually a non-negative integer less than 16
+ * (e.g. inside `add`/`sub` when `diff` is bounded by `PrecisionCutoff`). Table inputs avoid
+ * the `Math.pow` call; values outside `[0, 15]` safely fall back to `Math.pow(10, n)`.
  *
- * @param n - Integer in `[0, 15]`. Behaviour is undefined for values outside this range.
+ * @param n - The exponent. Integer values in `[0, 15]` use the lookup table.
  */
 export function pow10Int(n: number): number {
-    return POW10[n]!;
+    return n >= 0 && n < 16 ? POW10[n]! : Math.pow(10, n);
 }
