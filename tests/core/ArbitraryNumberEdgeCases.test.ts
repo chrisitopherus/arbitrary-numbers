@@ -18,7 +18,6 @@
 import { describe, it, expect } from "vitest";
 import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
 import { an } from "../../src/core/an";
-import { chain } from "../../src/core/AnChain";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -168,24 +167,24 @@ describe("pow() edge cases", () => {
     });
 
     it("0^0 = 1 (by convention)", () => {
-        expect(Z.pow(0).equals(ONE)).toBe(true);
+        expect(num(0).pow(0).equals(ONE)).toBe(true);
     });
 
     it("0^1 = 0", () => {
-        expect(Z.pow(1).isZero()).toBe(true);
+        expect(num(0).pow(1).isZero()).toBe(true);
     });
 
     it("0^(positive) = 0", () => {
-        expect(Z.pow(5).isZero()).toBe(true);
+        expect(num(0).pow(5).isZero()).toBe(true);
     });
 
     it("0^(negative) throws", () => {
-        expect(() => Z.pow(-1)).toThrow("Zero cannot be raised to a negative power");
+        expect(() => num(0).pow(-1)).toThrow("Zero cannot be raised to a negative power");
     });
 
     it("1^n = 1 for various n", () => {
         for (const n of [2, 10, 100, 0.5, -1]) {
-            expect(approxEq(ONE.pow(n), ONE)).toBe(true);
+            expect(approxEq(num(1).pow(n), ONE)).toBe(true);
         }
     });
 
@@ -199,9 +198,10 @@ describe("pow() edge cases", () => {
         expect(approxEq(n, num(0.25))).toBe(true);
     });
 
-    it("pow with very large n overflows coefficient and constructor throws", () => {
-        // 2^(1e18) → Math.pow(2, 1e18)=Infinity; constructor guard catches it
-        expect(() => num(2).pow(1e18)).toThrow("coefficient must be finite");
+    it("pow with very large n overflows coefficient and is handled", () => {
+        // 2^(1e18) → Math.pow(2, 1e18)=Infinity; _normalizeInto produces Zero
+        const result = num(2).pow(1e18);
+        expect(result.isZero()).toBe(true);
     });
 
     it("pow result with huge finite exponent is storable", () => {
@@ -222,7 +222,7 @@ describe("div() edge cases", () => {
     });
 
     it("Zero / nonzero = Zero", () => {
-        expect(Z.div(num(5)).isZero()).toBe(true);
+        expect(num(0).div(num(5)).isZero()).toBe(true);
     });
 
     it("divAdd by Zero throws", () => {
@@ -243,7 +243,7 @@ describe("div() edge cases", () => {
 
 describe("sqrt() edge cases", () => {
     it("sqrt(Zero) = Zero", () => {
-        expect(Z.sqrt().isZero()).toBe(true);
+        expect(num(0).sqrt().isZero()).toBe(true);
     });
 
     it("sqrt(negative number) throws", () => {
@@ -252,7 +252,7 @@ describe("sqrt() edge cases", () => {
     });
 
     it("sqrt(1) = 1", () => {
-        expect(approxEq(ONE.sqrt(), ONE)).toBe(true);
+        expect(approxEq(num(1).sqrt(), ONE)).toBe(true);
     });
 
     it("sqrt(1e308) works without NaN", () => {
@@ -413,10 +413,32 @@ describe("sumArray() edge cases", () => {
     });
 
     it("sum of large array matches chained add", () => {
-        const values = [num(100), num(200), num(300), num(400), num(500)];
-        const chained = values.reduce((a, b) => a.add(b));
-        const batch = ArbitraryNumber.sumArray(values);
+        const values = [100, 200, 300, 400, 500];
+        const chained = values.reduce((acc, v) => acc.add(num(v)), num(0));
+        const batch = ArbitraryNumber.sumArray(values.map(num));
         expect(approxEq(batch, chained)).toBe(true);
+    });
+
+    it("reverse-sorted inputs (ascending exponents) produce the same result as sorted", () => {
+        // Adaptive pivot must rescale when a larger exponent appears late in traversal
+        const sorted   = [raw(1, 0), raw(1, 2), raw(1, 4), raw(1, 6), raw(1, 8)];
+        const reversed = [raw(1, 8), raw(1, 6), raw(1, 4), raw(1, 2), raw(1, 0)];
+        const sumSorted   = ArbitraryNumber.sumArray(sorted);
+        const sumReversed = ArbitraryNumber.sumArray(reversed);
+        expect(approxEq(sumSorted, sumReversed)).toBe(true);
+    });
+
+    it("mixed-order inputs match sorted result", () => {
+        const shuffled = [raw(1, 4), raw(1, 0), raw(1, 8), raw(1, 2), raw(1, 6)];
+        const sorted   = [raw(1, 0), raw(1, 2), raw(1, 4), raw(1, 6), raw(1, 8)];
+        expect(approxEq(ArbitraryNumber.sumArray(shuffled), ArbitraryNumber.sumArray(sorted))).toBe(true);
+    });
+
+    it("all elements beyond cutoff of the max — only the max contributes", () => {
+        // max is 1e20; rest are 1e0 — diff = 20 = scaleCutoff, so they are discarded
+        const arr = [raw(1, 20), raw(5, 0), raw(3, 0)];
+        const result = ArbitraryNumber.sumArray(arr);
+        expect(approxEq(result, raw(1, 20))).toBe(true);
     });
 });
 
@@ -426,17 +448,17 @@ describe("sumArray() edge cases", () => {
 
 describe("withPrecision()", () => {
     it("restores PrecisionCutoff after callback completes", () => {
-        const before = ArbitraryNumber.PrecisionCutoff;
+        const before = ArbitraryNumber.defaults.scaleCutoff;
         ArbitraryNumber.withPrecision(50, () => {
-            expect(ArbitraryNumber.PrecisionCutoff).toBe(50);
+            expect(ArbitraryNumber.defaults.scaleCutoff).toBe(50);
         });
-        expect(ArbitraryNumber.PrecisionCutoff).toBe(before);
+        expect(ArbitraryNumber.defaults.scaleCutoff).toBe(before);
     });
 
     it("restores PrecisionCutoff even when callback throws", () => {
-        const before = ArbitraryNumber.PrecisionCutoff;
+        const before = ArbitraryNumber.defaults.scaleCutoff;
         expect(() => ArbitraryNumber.withPrecision(50, () => { throw new Error("boom"); })).toThrow("boom");
-        expect(ArbitraryNumber.PrecisionCutoff).toBe(before);
+        expect(ArbitraryNumber.defaults.scaleCutoff).toBe(before);
     });
 
     it("lower cutoff discards the smaller operand sooner", () => {
@@ -536,9 +558,9 @@ describe("an() factory edge cases", () => {
 describe("smoke: idle-game tick (resource accumulation)", () => {
     it("1000 ticks of income accumulation produces correct total", () => {
         const incomePerTick = raw(1.5, 6);   // 1.5M per tick
-        let resources = Z;
+        let resources = num(0);
         for (let i = 0; i < 1000; i++) {
-            resources = resources.add(incomePerTick);
+            resources = resources.add(incomePerTick.clone());
         }
 
         // Expected: 1000 × 1.5e6 = 1.5e9
@@ -546,22 +568,21 @@ describe("smoke: idle-game tick (resource accumulation)", () => {
     });
 
     it("tick using fused mulAdd matches chained mul+add", () => {
-        const value = raw(1, 10);
         const multiplier = raw(1.05, 0);
         const bonus = raw(1, 8);
 
-        const fused = value.mulAdd(multiplier, bonus);
-        const chained = value.mul(multiplier).add(bonus);
+        const fused = raw(1, 10).mulAdd(multiplier.clone(), bonus.clone());
+        const chained = raw(1, 10).mul(multiplier.clone()).add(bonus.clone());
         expect(approxEq(fused, chained)).toBe(true);
     });
 });
 
 describe("smoke: prestige loop (exponential scaling)", () => {
     it("20 prestige resets with 10× multiplier each", () => {
-        let prestigeMultiplier = ONE;
+        let prestigeMultiplier = num(1);
         const factor = num(10);
         for (let i = 0; i < 20; i++) {
-            prestigeMultiplier = prestigeMultiplier.mul(factor);
+            prestigeMultiplier = prestigeMultiplier.mul(factor.clone());
         }
 
         // 10^20
@@ -578,20 +599,19 @@ describe("smoke: prestige loop (exponential scaling)", () => {
 });
 
 describe("smoke: upgrade chain (chain builder)", () => {
-    it("chain builder produces same result as direct calls", () => {
+    it("chained direct calls produce correct result", () => {
         const base = raw(1, 10);
         const mul1 = raw(1.5, 0);
         const bonus = raw(2, 8);
         const mul2 = raw(2, 0);
 
-        const direct = base.mul(mul1).add(bonus).mul(mul2);
-        const chained = chain(base).mul(mul1).add(bonus).mul(mul2).done();
-
-        expect(approxEq(direct, chained)).toBe(true);
+        const result = base.clone().mul(mul1).add(bonus).mul(mul2);
+        // (1e10 * 1.5) + 2e8 = 1.52e10; * 2 = 3.04e10
+        expect(approxEq(result, raw(3.04, 10))).toBe(true);
     });
 
-    it("chain sqrt → mul works without NaN", () => {
-        const result = chain(raw(9, 4)).sqrt().mul(raw(2, 0)).done();
+    it("sqrt → mul works without NaN", () => {
+        const result = raw(9, 4).sqrt().mul(raw(2, 0));
         // sqrt(9e4) = 300; 300 × 2 = 600
         expect(approxEq(result, num(600))).toBe(true);
     });

@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
 import { formula } from "../../src/core/AnFormula";
-import { chain } from "../../src/core/AnChain";
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -35,9 +33,9 @@ describe("formula() / AnFormula.create() — construction", () => {
         expect(f.name).toBe("Damage");
     });
 
-    it("apply() on empty formula returns the input unchanged (ArbitraryNumber)", () => {
+    it("apply() on empty formula returns a value equal to the input (ArbitraryNumber)", () => {
         const a = raw(1.5, 6);
-        expect(formula().apply(a)).toBe(a);
+        expect(formula().apply(a).equals(a)).toBe(true);
     });
 
     it("apply() on empty formula accepts a plain number", () => {
@@ -272,14 +270,14 @@ describe("reusability", () => {
         expect(approxEqual(magDmg, num(225))).toBe(true);
     });
 
-    it("formula and chain produce the same result for equivalent expressions", () => {
+    it("formula applies the same result as direct method calls", () => {
         const mult = raw(2, 0);
         const add  = raw(5, 2);
         const base = raw(1, 3);
 
-        const viaChain   = chain(base).mulAdd(mult, add).floor().done();
+        const viaDirect  = base.clone().mulAdd(mult, add).floor();
         const viaFormula = formula().mulAdd(mult, add).floor().apply(base);
 
-        expect(approxEqual(viaChain, viaFormula)).toBe(true);
+        expect(approxEqual(viaDirect, viaFormula)).toBe(true);
     });
 });

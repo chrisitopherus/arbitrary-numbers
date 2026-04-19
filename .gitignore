@@ -32,3 +32,7 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Competitor benchmarks (local only)
+benchmarks/competitor.bench.ts
+benchmarks/COMPETITOR_BENCHMARKS.md

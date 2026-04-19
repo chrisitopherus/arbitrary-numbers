@@ -1,5 +1,4 @@
 import { ArbitraryNumber } from "../core/ArbitraryNumber";
-import { type NormalizedNumber } from "../types/core";
 
 /**
  * Type-guard helpers for {@link ArbitraryNumber} and {@link NormalizedNumber}.
@@ -21,21 +20,15 @@ export class ArbitraryNumberGuard {
     }
 
     /**
-     * Returns `true` if `obj` has the shape of a {@link NormalizedNumber}
-     * (i.e. has numeric `coefficient` and `exponent` properties).
+     * Returns `true` if `obj` has the shape `{ coefficient: number; exponent: number }`.
      *
-     * Note: both `ArbitraryNumber` instances and plain objects with the right
-     * shape will pass this check. Use {@link isArbitraryNumber} when you need
-     * to distinguish between the two.
-     *
-     * @param obj - The value to test.
-     * @returns `true` when `obj` has `typeof coefficient === "number"` and
-     *   `typeof exponent === "number"`.
+     * Both `ArbitraryNumber` instances and plain objects with the right shape pass this
+     * check. Use {@link isArbitraryNumber} to distinguish the two.
      */
-    public static isNormalizedNumber(obj: unknown): obj is NormalizedNumber {
+    public static isNormalizedNumber(obj: unknown): obj is { coefficient: number; exponent: number } {
         return obj != null
-            && typeof (obj as NormalizedNumber)?.coefficient === "number"
-            && typeof (obj as NormalizedNumber)?.exponent === "number";
+            && typeof (obj as Record<string, unknown>).coefficient === "number"
+            && typeof (obj as Record<string, unknown>).exponent === "number";
     }
 
     /**

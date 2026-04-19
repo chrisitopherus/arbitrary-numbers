@@ -1,13 +1,15 @@
 /**
  * Arithmetic benchmarks — mitata
  *
- * Each bench body loops N times over stable operands so mitata's per-call
- * overhead is amortized away. The loop counter is folded into the input so
- * V8 cannot dead-code-eliminate the work. Operands stay within the same
- * exponent range across all iterations so the measured code path is stable
- * (no accidental short-circuit or overflow after a few iterations).
+ * Each bench body loops N times over a pre-built operand array so mitata's
+ * per-call overhead is amortised away. Because ArbitraryNumber v2 mutates
+ * in-place, operands are cloned into a fresh working copy at the top of each
+ * bench iteration (outside the inner loop). This keeps the per-op cost pure
+ * while correctly reflecting the mutable semantics.
  *
- * Reported avg / N = per-operation cost of the library itself.
+ * The inner loop folds `i` into the coefficient so V8 cannot dead-code-eliminate
+ * the work. Operands stay within the same exponent range across all iterations
+ * so the measured code path is stable.
  *
  * Scenarios
  * ─────────
@@ -20,26 +22,23 @@
 
 import { bench, do_not_optimize, group, run, summary } from "mitata";
 import { ArbitraryNumber } from "../src/core/ArbitraryNumber";
-import { ArbitraryNumberArithmetic } from "../src/utility/ArbitraryNumberArithmetic";
-import { chain } from "../src/core/AnChain";
 
 const N = 100; // inner loop iterations per bench invocation
 
-// ─── Pre-built operand arrays — vary the coefficient slightly to defeat DCE
-//     while keeping exponents fixed so the hot code path stays constant.
+// ─── Seed arrays — used to build fresh working copies each bench call ────────
 
-const smallA  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 2));
-const smallB  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.5 + i * 0.001, 2));
-const mediumA = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
-const mediumB = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.2 + i * 0.001, 9));
-const largeA  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 50));
-const largeB  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.2 + i * 0.001, 60));
-const ncA     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 18));
-const ncB     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,  4));
-const bcA     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 20));
-const bcB     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,  0));
+const seedSmallA  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 2));
+const seedSmallB  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.5 + i * 0.001, 2));
+const seedMediumA = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
+const seedMediumB = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.2 + i * 0.001, 9));
+const seedLargeA  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 50));
+const seedLargeB  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.2 + i * 0.001, 60));
+const seedNcA     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 18));
+const seedNcB     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,  4));
+const seedBcA     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 20));
+const seedBcB     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,  0));
 
-// Native number equivalents
+// Native number equivalents (immutable — no clone needed)
 const smallNA  = Array.from({ length: N }, (_, i) => 150 + i * 0.1);
 const smallNB  = Array.from({ length: N }, (_, i) => 250 + i * 0.1);
 const mediumNA = Array.from({ length: N }, (_, i) => 1.5e6 + i);
@@ -51,6 +50,10 @@ const ncNB     = Array.from({ length: N }, (_, i) => 1e4 + i);
 const bcNA     = Array.from({ length: N }, () => 1.5e20);
 const bcNB     = Array.from({ length: N }, (_, i) => 1 + i * 0.001);
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const clone = (arr: ArbitraryNumber[]) => arr.map(n => n.clone());
+
 // ─── Construction / normalisation ─────────────────────────────────────────
 
 summary(() => {
@@ -61,13 +64,18 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber.from(number)      ", () => {
-            let v = ArbitraryNumber.Zero;
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
             for (let i = 0; i < N; i++) v = ArbitraryNumber.from(smallNA[i]!);
             do_not_optimize(v);
         });
         bench("new ArbitraryNumber(1.5, 3)       ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = new ArbitraryNumber(smallA[i]!.coefficient, 3);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = new ArbitraryNumber(seedSmallA[i]!.coefficient, 3);
+            do_not_optimize(v);
+        });
+        bench("clone()                           ", () => {
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = seedSmallA[i]!.clone();
             do_not_optimize(v);
         });
     });
@@ -82,14 +90,8 @@ summary(() => {
             }
             do_not_optimize(v);
         });
-        bench("ArbitraryNumberArithmetic.normalize", () => {
-            let v: ReturnType<typeof ArbitraryNumberArithmetic.normalize> = { coefficient: 0, exponent: 0 };
-            for (let i = 0; i < N; i++)
-                v = ArbitraryNumberArithmetic.normalize({ coefficient: 15000 + i, exponent: 0 });
-            do_not_optimize(v);
-        });
         bench("new ArbitraryNumber(15000, 0)     ", () => {
-            let v = ArbitraryNumber.Zero;
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
             for (let i = 0; i < N; i++) v = new ArbitraryNumber(15000 + i, 0);
             do_not_optimize(v);
         });
@@ -106,8 +108,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = smallA[i]!.add(smallB[i]!);
+            const a = clone(seedSmallA), b = clone(seedSmallB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.add(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -119,8 +122,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = mediumA[i]!.add(mediumB[i]!);
+            const a = clone(seedMediumA), b = clone(seedMediumB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.add(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -132,8 +136,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = largeA[i]!.add(largeB[i]!);
+            const a = clone(seedLargeA), b = clone(seedLargeB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.add(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -145,8 +150,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = ncA[i]!.add(ncB[i]!);
+            const a = clone(seedNcA), b = clone(seedNcB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.add(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -158,8 +164,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = bcA[i]!.add(bcB[i]!);
+            const a = clone(seedBcA), b = clone(seedBcB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.add(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -175,8 +182,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = mediumB[i]!.sub(mediumA[i]!);
+            const a = clone(seedMediumA), b = clone(seedMediumB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = b[i]!.sub(a[i]!);
             do_not_optimize(v);
         });
     });
@@ -188,8 +196,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = largeB[i]!.sub(largeA[i]!);
+            const a = clone(seedLargeA), b = clone(seedLargeB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = b[i]!.sub(a[i]!);
             do_not_optimize(v);
         });
     });
@@ -205,8 +214,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = smallA[i]!.mul(smallB[i]!);
+            const a = clone(seedSmallA), b = clone(seedSmallB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.mul(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -218,8 +228,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = mediumA[i]!.mul(mediumB[i]!);
+            const a = clone(seedMediumA), b = clone(seedMediumB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.mul(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -231,8 +242,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = largeA[i]!.mul(largeB[i]!);
+            const a = clone(seedLargeA), b = clone(seedLargeB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = a[i]!.mul(b[i]!);
             do_not_optimize(v);
         });
     });
@@ -248,8 +260,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = smallB[i]!.div(smallA[i]!);
+            const a = clone(seedSmallA), b = clone(seedSmallB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = b[i]!.div(a[i]!);
             do_not_optimize(v);
         });
     });
@@ -261,8 +274,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = mediumB[i]!.div(mediumA[i]!);
+            const a = clone(seedMediumA), b = clone(seedMediumB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = b[i]!.div(a[i]!);
             do_not_optimize(v);
         });
     });
@@ -274,8 +288,9 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = largeB[i]!.div(largeA[i]!);
+            const a = clone(seedLargeA), b = clone(seedLargeB);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = b[i]!.div(a[i]!);
             do_not_optimize(v);
         });
     });
@@ -292,7 +307,7 @@ summary(() => {
         });
         bench("ArbitraryNumber", () => {
             let v = 0;
-            for (let i = 0; i < N; i++) v = smallA[i]!.compareTo(smallB[i]!);
+            for (let i = 0; i < N; i++) v = seedSmallA[i]!.compareTo(seedSmallB[i]!);
             do_not_optimize(v);
         });
     });
@@ -305,7 +320,7 @@ summary(() => {
         });
         bench("ArbitraryNumber", () => {
             let v = 0;
-            for (let i = 0; i < N; i++) v = largeA[i]!.compareTo(largeB[i]!);
+            for (let i = 0; i < N; i++) v = seedLargeA[i]!.compareTo(seedLargeB[i]!);
             do_not_optimize(v);
         });
     });
@@ -314,14 +329,14 @@ summary(() => {
 // ─── Chained — idle-game tick ─────────────────────────────────────────────
 
 summary(() => {
-    const goldArr   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,   9));
-    const gpsArr    = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001,   3));
-    const multArr   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001,   2));
-    const dtArr     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.667 + i * 0.001, -2));
-    const nGold     = Array.from({ length: N }, (_, i) => 1e9 + i);
-    const nGps      = Array.from({ length: N }, (_, i) => 1500 + i * 0.1);
-    const nMult     = Array.from({ length: N }, (_, i) => 200 + i * 0.01);
-    const nDt       = Array.from({ length: N }, (_, i) => 0.01667 + i * 0.00001);
+    const seedGold   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001,   9));
+    const seedGps    = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001,   3));
+    const seedMult   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001,   2));
+    const seedDt     = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.667 + i * 0.001, -2));
+    const nGold      = Array.from({ length: N }, (_, i) => 1e9 + i);
+    const nGps       = Array.from({ length: N }, (_, i) => 1500 + i * 0.1);
+    const nMult      = Array.from({ length: N }, (_, i) => 200 + i * 0.01);
+    const nDt        = Array.from({ length: N }, (_, i) => 0.01667 + i * 0.00001);
 
     group("chained — idle-game tick  (gold += gps × mult × dt)", () => {
         bench("native expressions ", () => {
@@ -330,8 +345,10 @@ summary(() => {
             do_not_optimize(v);
         });
         bench("ArbitraryNumber     ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = goldArr[i]!.add(gpsArr[i]!.mul(multArr[i]!).mul(dtArr[i]!));
+            const gold = clone(seedGold), gps = clone(seedGps);
+            const mult = clone(seedMult), dt  = clone(seedDt);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = gold[i]!.add(gps[i]!.mul(mult[i]!).mul(dt[i]!));
             do_not_optimize(v);
         });
     });
@@ -340,67 +357,73 @@ summary(() => {
 // ─── Fused operations ─────────────────────────────────────────────────────
 
 summary(() => {
-    const baseArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
-    const multArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001, 3));
-    const addArr  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.0 + i * 0.001, 8));
+    const seedBase = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
+    const seedMult = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001, 3));
+    const seedAdd  = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.0 + i * 0.001, 8));
 
     group("fused mulAdd vs chained mul+add", () => {
         bench("chained  .mul().add()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.mul(multArr[i]!).add(addArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), add = clone(seedAdd);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.mul(mult[i]!).add(add[i]!);
             do_not_optimize(v);
         });
         bench("fused    .mulAdd()    ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.mulAdd(multArr[i]!, addArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), add = clone(seedAdd);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.mulAdd(mult[i]!, add[i]!);
             do_not_optimize(v);
         });
     });
 
     group("fused addMul vs chained add+mul", () => {
         bench("chained  .add().mul()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.add(addArr[i]!).mul(multArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), add = clone(seedAdd);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.add(add[i]!).mul(mult[i]!);
             do_not_optimize(v);
         });
         bench("fused    .addMul()   ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.addMul(addArr[i]!, multArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), add = clone(seedAdd);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.addMul(add[i]!, mult[i]!);
             do_not_optimize(v);
         });
     });
 });
 
 summary(() => {
-    const sources50 = Array.from({ length: 50 }, (_, i) =>
+    const seedSources50 = Array.from({ length: 50 }, (_, i) =>
         new ArbitraryNumber(1.0 + (i % 9) * 0.1, i % 8));
 
     group("sumArray(50) vs chained add(50)", () => {
-        bench("chained  .reduce(.add)", () =>
+        bench("chained  .reduce(.add)", () => {
+            const sources = clone(seedSources50);
             do_not_optimize(
-                sources50.reduce((acc, v) => acc.add(v), ArbitraryNumber.Zero)
-            ));
+                sources.reduce((acc, v) => acc.add(v), new ArbitraryNumber(0, 0))
+            );
+        });
         bench("sumArray([50])        ", () =>
-            do_not_optimize(ArbitraryNumber.sumArray(sources50)));
+            do_not_optimize(ArbitraryNumber.sumArray(seedSources50)));
     });
 });
 
 // ─── sqrt vs pow(0.5) ────────────────────────────────────────────────────
 
 summary(() => {
-    // Use a fixed even exponent so sqrt() always takes the fast path and
-    // the coefficient stays in [1,10) through the whole loop.
-    const sqrtArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
+    const seedSqrt = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
 
     group("sqrt() vs pow(0.5)", () => {
         bench("pow(0.5)", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = sqrtArr[i]!.pow(0.5);
+            const arr = clone(seedSqrt);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = arr[i]!.pow(0.5);
             do_not_optimize(v);
         });
         bench("sqrt()  ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = sqrtArr[i]!.sqrt();
+            const arr = clone(seedSqrt);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = arr[i]!.sqrt();
             do_not_optimize(v);
         });
     });
@@ -409,68 +432,78 @@ summary(() => {
 // ─── Tier 2 fused vs chained ─────────────────────────────────────────────
 
 summary(() => {
-    const baseArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
-    const multArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001, 3));
-    const opArr   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.0 + i * 0.001, 8));
+    const seedBase = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
+    const seedMult = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001, 3));
+    const seedOp   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.0 + i * 0.001, 8));
 
     group("fused mulSub vs chained mul+sub", () => {
         bench("chained  .mul().sub()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.mul(multArr[i]!).sub(opArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.mul(mult[i]!).sub(op[i]!);
             do_not_optimize(v);
         });
         bench("fused    .mulSub()   ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.mulSub(multArr[i]!, opArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.mulSub(mult[i]!, op[i]!);
             do_not_optimize(v);
         });
     });
 
     group("fused subMul vs chained sub+mul", () => {
         bench("chained  .sub().mul()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.sub(opArr[i]!).mul(multArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.sub(op[i]!).mul(mult[i]!);
             do_not_optimize(v);
         });
         bench("fused    .subMul()   ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.subMul(opArr[i]!, multArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.subMul(op[i]!, mult[i]!);
             do_not_optimize(v);
         });
     });
 
     group("fused divAdd vs chained div+add", () => {
         bench("chained  .div().add()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.div(multArr[i]!).add(opArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.div(mult[i]!).add(op[i]!);
             do_not_optimize(v);
         });
         bench("fused    .divAdd()   ", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.divAdd(multArr[i]!, opArr[i]!);
+            const base = clone(seedBase), mult = clone(seedMult), op = clone(seedOp);
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = base[i]!.divAdd(mult[i]!, op[i]!);
             do_not_optimize(v);
         });
     });
 });
 
-// ─── AnChain builder vs direct method chaining ──────────────────────────
+// ─── formula.applyInPlace vs formula.apply ────────────────────────────────
+
+import { formula } from "../src/core/AnFormula";
 
 summary(() => {
-    const baseArr    = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
-    const multArr    = Array.from({ length: N }, (_, i) => new ArbitraryNumber(2.0 + i * 0.001, 3));
-    const bonusArr   = Array.from({ length: N }, (_, i) => new ArbitraryNumber(3.0 + i * 0.001, 8));
-    const penaltyArr = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.0 + i * 0.001, 7));
+    const seedBase    = Array.from({ length: N }, (_, i) => new ArbitraryNumber(1.5 + i * 0.001, 6));
+    const multiplier  = new ArbitraryNumber(2.0, 3);
+    const bonus       = new ArbitraryNumber(3.0, 8);
+    const penalty     = new ArbitraryNumber(1.0, 7);
 
-    group("AnChain builder vs direct chaining (3-step formula)", () => {
-        bench("direct   .mulAdd().sub()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = baseArr[i]!.mulAdd(multArr[i]!, bonusArr[i]!).sub(penaltyArr[i]!);
+    const f = formula().mulAdd(multiplier, bonus).sub(penalty);
+
+    group("formula.apply vs formula.applyInPlace (3-step formula)", () => {
+        bench("apply()        (clones input)", () => {
+            let v: ArbitraryNumber = ArbitraryNumber.Zero;
+            for (let i = 0; i < N; i++) v = f.apply(seedBase[i]!);
             do_not_optimize(v);
         });
-        bench("chain()  .mulAdd().sub().done()", () => {
-            let v = ArbitraryNumber.Zero;
-            for (let i = 0; i < N; i++) v = chain(baseArr[i]!).mulAdd(multArr[i]!, bonusArr[i]!).sub(penaltyArr[i]!).done();
-            do_not_optimize(v);
+        bench("applyInPlace() (mutates input)", () => {
+            const arr = clone(seedBase);
+            for (let i = 0; i < N; i++) f.applyInPlace(arr[i]!);
+            do_not_optimize(arr[N - 1]!);
         });
     });
 });

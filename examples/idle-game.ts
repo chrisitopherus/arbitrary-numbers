@@ -1,74 +1,77 @@
+/**
+ * Idle game simulation — 350-tick growth loop.
+ *
+ * Demonstrates:
+ *  - Fused mulAdd for zero-allocation tick math
+ *  - ArbitraryNumberHelpers for afford-check
+ *  - UnitNotation (K/M/B/T...) with letterNotation fallback past centillion
+ *  - Values growing beyond float64's max (~1e308) — JS sees Infinity, ArbitraryNumber keeps going
+ */
+
 import {
     an,
-    chain,
-    UnitNotation,
-    CLASSIC_UNITS,
-    letterNotation,
+    UnitNotation, CLASSIC_UNITS, letterNotation, scientificNotation,
     ArbitraryNumberHelpers as helpers,
 } from "../src/index.ts";
 import type { ArbitraryNumber } from "../src/index.ts";
 
-let gold = an(5, 6);      // 5,000,000
-let gps = an(2, 5);       // 200,000 per tick
-let reactorCost = an(1, 9);
-let reactors = 0;
+// UnitNotation covers K/M/B/T … centillion; anything beyond falls back to
+// letter notation (1.23a, 1.23b, …)
+// Note: CLASSIC_UNITS has gaps (undefined tiers) between named illion names —
+// for exponents in those gaps, UnitNotation falls through to a plain number.
+// We switch to scientificNotation when the exponent exceeds the last CLASSIC_UNITS
+// entry (centillion = exponent 303) to always show a readable label.
+const unitDisplay = new UnitNotation({ units: CLASSIC_UNITS, fallback: letterNotation });
 
-const display = new UnitNotation({
-    units: CLASSIC_UNITS,
-    fallback: letterNotation,
-});
+const fmt = (v: ArbitraryNumber, d = 2) =>
+    v.exponent > 303 ? v.toString(scientificNotation, d) : v.toString(unitDisplay, d);
 
-function fmt(value: ArbitraryNumber, decimals = 2): string {
-    return value.toString(display, decimals);
-}
+// ── Initial game state ─────────────────────────────────────────────────────────
 
-function snapshot(tick: number): void {
-    console.log(
-        `[t=${String(tick).padStart(4)}] SNAPSHOT  `
-        + `gold=${fmt(gold, 2).padStart(12)}  gps=${fmt(gps, 2).padStart(12)}`,
-    );
-}
+let gold        = an(1, 0);   //        1
+let gps         = an(1, 0);   //        1 gold/tick
+let upgradeCost = an(1, 2);   //      100 (first upgrade)
+let upgrades    = 0;
 
-console.log("=== Hyper-growth idle loop (720 ticks) ===");
-console.log(`start gold=${fmt(gold)}  gps=${fmt(gps)}  reactorCost=${fmt(reactorCost)}`);
+console.log("=== Idle game simulation (350 ticks) ===");
+console.log(`start  gold=${fmt(gold)}  gps=${fmt(gps)}  upgradeCost=${fmt(upgradeCost)}\n`);
 
-for (let t = 1; t <= 720; t += 1) {
-    // Core growth: gold = (gold * 1.12) + gps
-    gold = gold.mulAdd(an(1.12), gps);
+// ── Main loop ──────────────────────────────────────────────────────────────────
 
-    if (t % 60 === 0 && helpers.meetsOrExceeds(gold, reactorCost)) {
-        const before = gps;
-        gold = gold.sub(reactorCost);
-        gps = chain(gps).mul(an(1, 25)).floor().done();
-        reactorCost = reactorCost.mul(an(8));
-        reactors += 1;
+for (let t = 1; t <= 350; t++) {
+    // Core tick: gold = (gold × 10) + gps  — fused op, zero allocation
+    gold.mulAdd(an(1, 1), gps);
 
+    // Buy up to 25 upgrades: each multiplies gps by 1,000 and raises next cost by 1,000,000
+    if (upgrades < 25 && helpers.meetsOrExceeds(gold, upgradeCost)) {
+        const prevGps = gps.clone();
+        gold.sub(upgradeCost);
+        gps.mul(an(1, 3));
+        upgradeCost.mul(an(1, 6));
+        upgrades++;
         console.log(
-            `[t=${String(t).padStart(4)}] REACTOR   #${String(reactors).padStart(2)}  `
-            + `gps ${fmt(before)} -> ${fmt(gps)}  `
-            + `nextCost=${fmt(reactorCost)}`,
+            `[t=${String(t).padStart(3)}] UPGRADE #${String(upgrades).padStart(2)}  `
+            + `gps ${fmt(prevGps).padStart(10)} → ${fmt(gps).padStart(10)}   next cost: ${upgradeCost.toString(scientificNotation)}`,
         );
     }
 
-    if (t === 240 || t === 480) {
-        const before = gps;
-        gps = chain(gps)
-            .mul(an(1, 4))
-            .add(an(7.5, 6))
-            .floor()
-            .done();
-        console.log(`[t=${String(t).padStart(4)}] PRESTIGE  gps ${fmt(before)} -> ${fmt(gps)}`);
-    }
-
-    if (t % 120 === 0) {
-        snapshot(t);
+    if (t % 70 === 0) {
+        const jsVal = gold.toNumber();
+        const jsStr = isFinite(jsVal) ? jsVal.toExponential(2) : "Infinity  ← beyond float64 max!";
+        console.log(
+            `[t=${String(t).padStart(3)}] snapshot  AN: ${fmt(gold).padStart(16)}   JS: ${jsStr}`,
+        );
     }
 }
 
-console.log("\n=== Final scale check ===");
-console.log(`reactors bought: ${reactors}`);
-console.log(`final gold (unit+letter): ${fmt(gold)}`);
-console.log(`final gps  (unit+letter): ${fmt(gps)}`);
-console.log(`final gold as JS Number: ${gold.toNumber()}`);
-console.log(`final gps as JS Number : ${gps.toNumber()}`);
-console.log("If JS shows Infinity while unit+letter output stays finite, the library is doing its job.");
+// ── Final state ────────────────────────────────────────────────────────────────
+
+console.log("");
+console.log("=== Final state ===");
+console.log(`Upgrades bought : ${upgrades}`);
+console.log(`Final gold (AN) : ${fmt(gold)}`);
+console.log(`Final gps  (AN) : ${fmt(gps)}`);
+console.log(`Gold as JS num  : ${gold.toNumber()}`);
+console.log(`GPS  as JS num  : ${gps.toNumber()}`);
+console.log("");
+console.log("JS shows Infinity past ~1e308. ArbitraryNumber is still tracking the exact value.");

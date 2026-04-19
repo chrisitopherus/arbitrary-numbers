@@ -77,21 +77,18 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("identity elements", () => {
         it("Zero is the additive identity: a + 0 = a and 0 + a = a", () => {
-            const a = num(1500);
-            expect(a.add(ArbitraryNumber.Zero).equals(a)).toBe(true);
-            expect(ArbitraryNumber.Zero.add(a).equals(a)).toBe(true);
+            expect(num(1500).add(ArbitraryNumber.Zero).equals(num(1500))).toBe(true);
+            expect(num(0).add(num(1500)).equals(num(1500))).toBe(true);
         });
 
         it("One is the multiplicative identity: a × 1 = a and 1 × a = a", () => {
-            const a = num(1500);
-            expect(a.mul(ArbitraryNumber.One).equals(a)).toBe(true);
-            expect(ArbitraryNumber.One.mul(a).equals(a)).toBe(true);
+            expect(num(1500).mul(ArbitraryNumber.One).equals(num(1500))).toBe(true);
+            expect(num(1).mul(num(1500)).equals(num(1500))).toBe(true);
         });
 
         it("Zero is the multiplicative absorber: a × 0 = 0 and 0 × a = 0", () => {
-            const a = num(1500);
-            expect(a.mul(ArbitraryNumber.Zero).equals(ArbitraryNumber.Zero)).toBe(true);
-            expect(ArbitraryNumber.Zero.mul(a).equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(1500).mul(ArbitraryNumber.Zero).isZero()).toBe(true);
+            expect(num(0).mul(num(1500)).isZero()).toBe(true);
         });
     });
 
@@ -100,21 +97,19 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("addition", () => {
         it("is commutative: a + b = b + a", () => {
-            const a = num(1500);
-            const b = num(250);
-            expect(a.add(b).equals(b.add(a))).toBe(true);
+            const lhs = num(1500).add(num(250));
+            const rhs = num(250).add(num(1500));
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("is associative: (a + b) + c = a + (b + c)", () => {
-            const a = num(1000);
-            const b = num(500);
-            const c = num(250);
-            expect(a.add(b).add(c).equals(a.add(b.add(c)))).toBe(true);
+            const lhs = num(1000).add(num(500)).add(num(250));
+            const rhs = num(1000).add(num(500).add(num(250)));
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("additive inverse: a + (−a) = 0", () => {
-            const a = num(1500);
-            expect(a.add(a.negate()).equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(1500).add(num(-1500)).isZero()).toBe(true);
         });
 
         it("1500 + 2500 = 4000", () => {
@@ -145,10 +140,9 @@ describe("ArbitraryNumber", () => {
         });
 
         it("numbers exactly at the precision boundary both contribute to the sum", () => {
-            // exponent diff = PrecisionCutoff exactly → both operands are included
-            const a = raw(1, 18);
-            const b = raw(1, 3);
-            expect(a.add(b).greaterThan(a)).toBe(true);
+            // exponent diff = 15 (scaleCutoff default) → both operands are included
+            const result = raw(1, 18).add(raw(1, 3));
+            expect(result.greaterThan(raw(1, 18))).toBe(true);
         });
     });
 
@@ -157,24 +151,21 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("subtraction", () => {
         it("a − b = a + (−b)", () => {
-            const a = num(4000);
-            const b = num(1500);
-            expect(a.sub(b).equals(a.add(b.negate()))).toBe(true);
+            const lhs = num(4000).sub(num(1500));
+            const rhs = num(4000).add(num(-1500));
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("a − a = 0", () => {
-            const a = num(1500);
-            expect(a.sub(a).equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(1500).sub(num(1500)).isZero()).toBe(true);
         });
 
         it("a − 0 = a", () => {
-            const a = num(1500);
-            expect(a.sub(ArbitraryNumber.Zero).equals(a)).toBe(true);
+            expect(num(1500).sub(ArbitraryNumber.Zero).equals(num(1500))).toBe(true);
         });
 
         it("0 − a = −a", () => {
-            const a = num(1500);
-            expect(ArbitraryNumber.Zero.sub(a).equals(a.negate())).toBe(true);
+            expect(num(0).sub(num(1500)).equals(num(-1500))).toBe(true);
         });
 
         it("4000 − 1500 = 2500", () => {
@@ -191,16 +182,13 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("multiplication", () => {
         it("is commutative: a × b = b × a", () => {
-            const a = num(1500);
-            const b = num(250);
-            expect(a.mul(b).equals(b.mul(a))).toBe(true);
+            expect(num(1500).mul(num(250)).equals(num(250).mul(num(1500)))).toBe(true);
         });
 
         it("is associative: (a × b) × c = a × (b × c)", () => {
-            const a = num(2);
-            const b = num(3);
-            const c = num(4);
-            expect(a.mul(b).mul(c).equals(a.mul(b.mul(c)))).toBe(true);
+            const lhs = num(2).mul(num(3)).mul(num(4));
+            const rhs = num(2).mul(num(3).mul(num(4)));
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("2000 × 3000 = 6 000 000", () => {
@@ -220,7 +208,7 @@ describe("ArbitraryNumber", () => {
         });
 
         it("10 × 10 = 100", () => {
-            expect(ArbitraryNumber.Ten.mul(ArbitraryNumber.Ten).equals(num(100))).toBe(true);
+            expect(num(10).mul(num(10)).equals(num(100))).toBe(true);
         });
     });
 
@@ -229,9 +217,7 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("division", () => {
         it("(a × b) / b = a", () => {
-            const a = num(1500);
-            const b = num(250);
-            expect(a.mul(b).div(b).equals(a)).toBe(true);
+            expect(num(1500).mul(num(250)).div(num(250)).equals(num(1500))).toBe(true);
         });
 
         it("a / a = 1", () => {
@@ -239,8 +225,7 @@ describe("ArbitraryNumber", () => {
         });
 
         it("a / 1 = a", () => {
-            const a = num(1500);
-            expect(a.div(ArbitraryNumber.One).equals(a)).toBe(true);
+            expect(num(1500).div(ArbitraryNumber.One).equals(num(1500))).toBe(true);
         });
 
         it("6 000 000 / 3000 = 2000", () => {
@@ -248,11 +233,11 @@ describe("ArbitraryNumber", () => {
         });
 
         it("division producing a negative exponent: 1 / 10 = 0.1", () => {
-            expect(ArbitraryNumber.One.div(ArbitraryNumber.Ten).equals(raw(1, -1))).toBe(true);
+            expect(num(1).div(num(10)).equals(raw(1, -1))).toBe(true);
         });
 
         it("0 / a = 0 for any non-zero a", () => {
-            expect(ArbitraryNumber.Zero.div(num(1500)).equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(0).div(num(1500)).isZero()).toBe(true);
         });
 
         it("throws on division by zero", () => {
@@ -266,40 +251,39 @@ describe("ArbitraryNumber", () => {
     describe("power", () => {
         it("a^0 = 1 for all a, including 0^0 = 1 by convention", () => {
             expect(num(1500).pow(0).equals(ArbitraryNumber.One)).toBe(true);
-            expect(ArbitraryNumber.Zero.pow(0).equals(ArbitraryNumber.One)).toBe(true);
+            expect(num(0).pow(0).equals(ArbitraryNumber.One)).toBe(true);
         });
 
         it("a^1 = a", () => {
-            const a = num(1500);
-            expect(a.pow(1).equals(a)).toBe(true);
+            expect(num(1500).pow(1).equals(num(1500))).toBe(true);
         });
 
         it("exponent addition law: a^m × a^n = a^(m+n)", () => {
-            const a = num(3);
-            expect(a.pow(2).mul(a.pow(3)).equals(a.pow(5))).toBe(true);
+            const lhs = num(3).pow(2).mul(num(3).pow(3));
+            const rhs = num(3).pow(5);
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("product-to-power law: (a × b)^n = a^n × b^n", () => {
-            const a = num(2);
-            const b = num(3);
-            expect(a.mul(b).pow(3).equals(a.pow(3).mul(b.pow(3)))).toBe(true);
+            const lhs = num(2).mul(num(3)).pow(3);
+            const rhs = num(2).pow(3).mul(num(3).pow(3));
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("a^−1 is the multiplicative inverse: a × a^−1 = 1", () => {
-            const a = num(4);
-            expect(a.mul(a.pow(-1)).equals(ArbitraryNumber.One)).toBe(true);
+            expect(num(4).mul(num(4).pow(-1)).equals(ArbitraryNumber.One)).toBe(true);
         });
 
         it("0^n = 0 for all n > 0", () => {
-            expect(ArbitraryNumber.Zero.pow(5).equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(0).pow(5).isZero()).toBe(true);
         });
 
         it("0^n throws for n < 0 (division by zero)", () => {
-            expect(() => ArbitraryNumber.Zero.pow(-1)).toThrow();
+            expect(() => num(0).pow(-1)).toThrow();
         });
 
         it("1^n = 1 for all n (including very large n)", () => {
-            expect(ArbitraryNumber.One.pow(1_000_000).equals(ArbitraryNumber.One)).toBe(true);
+            expect(num(1).pow(1_000_000).equals(ArbitraryNumber.One)).toBe(true);
         });
     });
 
@@ -373,8 +357,7 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("negate and abs", () => {
         it("double negation: −(−a) = a", () => {
-            const a = num(1500);
-            expect(a.negate().negate().equals(a)).toBe(true);
+            expect(num(1500).negate().negate().equals(num(1500))).toBe(true);
         });
 
         it("|a| ≥ 0 for all a", () => {
@@ -383,18 +366,17 @@ describe("ArbitraryNumber", () => {
         });
 
         it("|a| = |−a|", () => {
-            const a = num(1500);
-            expect(a.abs().equals(a.negate().abs())).toBe(true);
+            expect(num(1500).abs().equals(num(-1500).abs())).toBe(true);
         });
 
         it("|a × b| = |a| × |b|", () => {
-            const a = num(-2000);
-            const b = num(-3000);
-            expect(a.mul(b).abs().equals(a.abs().mul(b.abs()))).toBe(true);
+            const lhs = num(-2000).mul(num(-3000)).abs();
+            const rhs = num(2000).abs().mul(num(3000).abs());
+            expect(lhs.equals(rhs)).toBe(true);
         });
 
         it("negate of Zero is Zero", () => {
-            expect(ArbitraryNumber.Zero.negate().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(0).negate().isZero()).toBe(true);
         });
     });
 
@@ -403,9 +385,9 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("floor and ceil", () => {
         it("floor(a) ≤ a ≤ ceil(a) for any value", () => {
-            for (const a of [num(1.7), num(1.3), raw(1.57, 1), raw(9.99, 2)]) {
-                expect(a.floor().lessThanOrEqual(a)).toBe(true);
-                expect(a.ceil().greaterThanOrEqual(a)).toBe(true);
+            for (const [c, e] of [[1.7, 0], [1.3, 0], [1.57, 1], [9.99, 2]]) {
+                expect(raw(c!, e!).floor().lessThanOrEqual(raw(c!, e!))).toBe(true);
+                expect(raw(c!, e!).ceil().greaterThanOrEqual(raw(c!, e!))).toBe(true);
             }
         });
 
@@ -415,8 +397,9 @@ describe("ArbitraryNumber", () => {
         });
 
         it("ceil(a) = floor(a) + 1 for non-integer a", () => {
-            const a = raw(1.5, 0); // 1.5
-            expect(a.ceil().equals(a.floor().add(ArbitraryNumber.One))).toBe(true);
+            const ceilResult = raw(1.5, 0).ceil();           // 2
+            const floorPlusOne = raw(1.5, 0).floor().add(num(1)); // 1+1=2
+            expect(ceilResult.equals(floorPlusOne)).toBe(true);
         });
 
         it("floor of a positive fraction (0.5) = 0", () => {
@@ -424,7 +407,7 @@ describe("ArbitraryNumber", () => {
         });
 
         it("ceil of a positive fraction (0.5) = 1", () => {
-            expect(raw(5, -1).ceil().equals(ArbitraryNumber.One)).toBe(true);
+            expect(raw(5, -1).ceil().equals(num(1))).toBe(true);
         });
 
         it("floor of a negative fraction (−0.5) = −1", () => {
@@ -446,8 +429,8 @@ describe("ArbitraryNumber", () => {
         });
 
         it("ceil of small positive fraction (exponent <= -2) = 1", () => {
-            expect(raw(9.9, -2).ceil().equals(ArbitraryNumber.One)).toBe(true);
-            expect(raw(1.0, -5).ceil().equals(ArbitraryNumber.One)).toBe(true);
+            expect(raw(9.9, -2).ceil().equals(num(1))).toBe(true);
+            expect(raw(1.0, -5).ceil().equals(num(1))).toBe(true);
         });
 
         it("ceil of small negative fraction (exponent <= -2) = 0", () => {
@@ -456,8 +439,8 @@ describe("ArbitraryNumber", () => {
         });
 
         it("floor/ceil of zero = zero", () => {
-            expect(ArbitraryNumber.Zero.floor().equals(ArbitraryNumber.Zero)).toBe(true);
-            expect(ArbitraryNumber.Zero.ceil().equals(ArbitraryNumber.Zero)).toBe(true);
+            expect(num(0).floor().isZero()).toBe(true);
+            expect(num(0).ceil().isZero()).toBe(true);
         });
 
         it("round of small fraction (exponent <= -2) = 0", () => {
@@ -478,22 +461,21 @@ describe("ArbitraryNumber", () => {
     // -----------------------------------------------------------------------
     describe("log10", () => {
         it("log10(1) = 0", () => {
-            expect(ArbitraryNumber.One.log10()).toBeCloseTo(0, 10);
+            expect(num(1).log10()).toBeCloseTo(0, 10);
         });
 
         it("log10(10) = 1", () => {
-            expect(ArbitraryNumber.Ten.log10()).toBeCloseTo(1, 10);
+            expect(num(10).log10()).toBeCloseTo(1, 10);
         });
 
         it("product rule: log10(a × b) = log10(a) + log10(b)", () => {
-            const a = num(200);
-            const b = num(500);
-            expect(a.mul(b).log10()).toBeCloseTo(a.log10() + b.log10(), 10);
+            const product = num(200).mul(num(500)).log10();
+            const sumLogs = num(200).log10() + num(500).log10();
+            expect(product).toBeCloseTo(sumLogs, 10);
         });
 
         it("power rule: log10(a^n) = n × log10(a)", () => {
-            const a = num(10);
-            expect(a.pow(5).log10()).toBeCloseTo(5 * a.log10(), 10);
+            expect(num(10).pow(5).log10()).toBeCloseTo(5 * num(10).log10(), 10);
         });
 
         it("log10 with very large exponent stays accurate", () => {
