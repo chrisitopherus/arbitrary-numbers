@@ -49,6 +49,51 @@ describe("ArbitraryNumberGuard", () => {
     });
 
     // -----------------------------------------------------------------------
+    // isNormalizedNumber
+    // -----------------------------------------------------------------------
+    describe("isNormalizedNumber", () => {
+        it("returns true for a plain object with numeric coefficient and exponent", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber({ coefficient: 1.5, exponent: 3 })).toBe(true);
+        });
+
+        it("returns true for an ArbitraryNumber instance (structural match)", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber(new ArbitraryNumber(1.5, 3))).toBe(true);
+        });
+
+        it("returns true for ArbitraryNumber.Zero", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber(ArbitraryNumber.Zero)).toBe(true);
+        });
+
+        it("returns false for an object missing exponent", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber({ coefficient: 1.5 })).toBe(false);
+        });
+
+        it("returns false for an object missing coefficient", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber({ exponent: 3 })).toBe(false);
+        });
+
+        it("returns false when coefficient is a string", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber({ coefficient: "1.5", exponent: 3 })).toBe(false);
+        });
+
+        it("returns false for null", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber(null)).toBe(false);
+        });
+
+        it("returns false for undefined", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber(undefined)).toBe(false);
+        });
+
+        it("returns false for an empty object", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber({})).toBe(false);
+        });
+
+        it("returns false for a number primitive", () => {
+            expect(ArbitraryNumberGuard.isNormalizedNumber(42)).toBe(false);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // isZero
     // -----------------------------------------------------------------------
     describe("isZero", () => {

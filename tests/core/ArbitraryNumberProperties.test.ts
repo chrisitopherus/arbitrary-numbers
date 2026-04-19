@@ -6,15 +6,13 @@ import { ArbitraryNumber } from "../../src/core/ArbitraryNumber";
 // Generators
 // ---------------------------------------------------------------------------
 
-// Small integers for exponents to keep values in sane range
 const smallExp = fc.integer({ min: -6, max: 6 });
 
-// Positive-only finite numbers (for bases, steps, etc.)
 const positiveNumber = fc.integer({ min: 1, max: 999999 }).map(n => n);
 
 // ArbitraryNumber arbitrary: coefficient in [1, 10), exponent in [-6, 6]
 const arbitraryNum = fc.tuple(
-    fc.integer({ min: 100, max: 999 }).map(n => n / 100),  // 1.00 – 9.99
+    fc.integer({ min: 100, max: 999 }).map(n => n / 100),
     smallExp,
 ).map(([c, e]) => new ArbitraryNumber(c, e));
 
@@ -38,13 +36,13 @@ function closeEnough(a: ArbitraryNumber, b: ArbitraryNumber, relTol = 1e-9): boo
 }
 
 // ---------------------------------------------------------------------------
-// Commutativity
+// Commutativity — use clones so each call gets a fresh instance
 // ---------------------------------------------------------------------------
 
 describe("property: add commutativity — a + b = b + a", () => {
     it("holds for positive pairs", () => {
         fc.assert(fc.property(arbitraryNum, arbitraryNum, (a, b) => {
-            return a.add(b).equals(b.add(a));
+            return a.clone().add(b.clone()).equals(b.clone().add(a.clone()));
         }), { numRuns: 200 });
     });
 });
@@ -52,7 +50,7 @@ describe("property: add commutativity — a + b = b + a", () => {
 describe("property: mul commutativity — a * b = b * a", () => {
     it("holds for all pairs", () => {
         fc.assert(fc.property(arbitraryNumWithNeg, arbitraryNumWithNeg, (a, b) => {
-            return closeEnough(a.mul(b), b.mul(a));
+            return closeEnough(a.clone().mul(b.clone()), b.clone().mul(a.clone()));
         }), { numRuns: 200 });
     });
 });
@@ -68,11 +66,9 @@ describe("property: add associativity — (a + b) + c ≈ a + (b + c)", () => {
             fc.integer({ min: 1, max: 99_999 }),
             fc.integer({ min: 1, max: 99_999 }),
             (av, bv, cv) => {
-                const a = ArbitraryNumber.from(av);
-                const b = ArbitraryNumber.from(bv);
-                const c = ArbitraryNumber.from(cv);
-
-                return closeEnough(a.add(b).add(c), a.add(b.add(c)));
+                const lhs = ArbitraryNumber.from(av).add(ArbitraryNumber.from(bv)).add(ArbitraryNumber.from(cv));
+                const rhs = ArbitraryNumber.from(av).add(ArbitraryNumber.from(bv).add(ArbitraryNumber.from(cv)));
+                return closeEnough(lhs, rhs);
             }), { numRuns: 300 });
     });
 });
@@ -84,11 +80,9 @@ describe("property: mul associativity — (a * b) * c ≈ a * (b * c)", () => {
             fc.integer({ min: 100, max: 500 }).map(n => n / 100),
             fc.integer({ min: 100, max: 500 }).map(n => n / 100),
             (av, bv, cv) => {
-                const a = ArbitraryNumber.from(av);
-                const b = ArbitraryNumber.from(bv);
-                const c = ArbitraryNumber.from(cv);
-
-                return closeEnough(a.mul(b).mul(c), a.mul(b.mul(c)));
+                const lhs = ArbitraryNumber.from(av).mul(ArbitraryNumber.from(bv)).mul(ArbitraryNumber.from(cv));
+                const rhs = ArbitraryNumber.from(av).mul(ArbitraryNumber.from(bv).mul(ArbitraryNumber.from(cv)));
+                return closeEnough(lhs, rhs);
             }), { numRuns: 300 });
     });
 });
@@ -104,11 +98,9 @@ describe("property: distributivity — a * (b + c) ≈ a*b + a*c", () => {
             fc.integer({ min: 1, max: 9999 }),
             fc.integer({ min: 1, max: 9999 }),
             (av, bv, cv) => {
-                const a = ArbitraryNumber.from(av);
-                const b = ArbitraryNumber.from(bv);
-                const c = ArbitraryNumber.from(cv);
-
-                return closeEnough(a.mul(b.add(c)), a.mul(b).add(a.mul(c)));
+                const lhs = ArbitraryNumber.from(av).mul(ArbitraryNumber.from(bv).add(ArbitraryNumber.from(cv)));
+                const rhs = ArbitraryNumber.from(av).mul(ArbitraryNumber.from(bv)).add(ArbitraryNumber.from(av).mul(ArbitraryNumber.from(cv)));
+                return closeEnough(lhs, rhs);
             }), { numRuns: 200 });
     });
 });
@@ -120,7 +112,7 @@ describe("property: distributivity — a * (b + c) ≈ a*b + a*c", () => {
 describe("property: sqrt(x)^2 ≈ x", () => {
     it("holds for positive arbitraryNumbers", () => {
         fc.assert(fc.property(arbitraryNum, (a) => {
-            return closeEnough(a.sqrt().pow(2), a, 1e-8);
+            return closeEnough(a.clone().sqrt().pow(2), a, 1e-8);
         }), { numRuns: 200 });
     });
 });
@@ -130,7 +122,7 @@ describe("property: pow(2).sqrt() ≈ x (= pow(0.5) round-trip)", () => {
         fc.assert(fc.property(
             fc.integer({ min: 100, max: 999 }).map(n => new ArbitraryNumber(n / 100, 0)),
             (a) => {
-                return closeEnough(a.pow(2).sqrt(), a, 1e-7);
+                return closeEnough(a.clone().pow(2).sqrt(), a, 1e-7);
             }), { numRuns: 200 });
     });
 });
@@ -166,13 +158,15 @@ describe("property: fromJSON(toJSON(x)) equals x", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fused op equivalence
+// Fused op equivalence — use fresh instances for each side of the comparison
 // ---------------------------------------------------------------------------
 
 describe("property: mulAdd fused = mul + add", () => {
     it("holds for all inputs", () => {
         fc.assert(fc.property(arbitraryNum, arbitraryNum, arbitraryNum, (a, b, c) => {
-            return closeEnough(a.mulAdd(b, c), a.mul(b).add(c));
+            const fused = a.clone().mulAdd(b.clone(), c.clone());
+            const stepped = a.clone().mul(b.clone()).add(c.clone());
+            return closeEnough(fused, stepped);
         }), { numRuns: 200 });
     });
 });
@@ -180,7 +174,9 @@ describe("property: mulAdd fused = mul + add", () => {
 describe("property: addMul fused = add + mul", () => {
     it("holds for all inputs", () => {
         fc.assert(fc.property(arbitraryNum, arbitraryNum, arbitraryNum, (a, b, c) => {
-            return closeEnough(a.addMul(b, c), a.add(b).mul(c));
+            const fused = a.clone().addMul(b.clone(), c.clone());
+            const stepped = a.clone().add(b.clone()).mul(c.clone());
+            return closeEnough(fused, stepped);
         }), { numRuns: 200 });
     });
 });
@@ -189,7 +185,9 @@ describe("property: mulDiv fused = mul + div", () => {
     it("holds for all inputs", () => {
         fc.assert(fc.property(arbitraryNum, arbitraryNum, positiveNumber, (a, b, cv) => {
             const c = ArbitraryNumber.from(cv);
-            return closeEnough(a.mulDiv(b, c), a.mul(b).div(c));
+            const fused = a.clone().mulDiv(b.clone(), c.clone());
+            const stepped = a.clone().mul(b.clone()).div(c.clone());
+            return closeEnough(fused, stepped);
         }), { numRuns: 200 });
     });
 });
@@ -198,7 +196,9 @@ describe("property: divAdd fused = div + add", () => {
     it("holds for all inputs", () => {
         fc.assert(fc.property(arbitraryNum, positiveNumber, arbitraryNum, (a, bv, c) => {
             const b = ArbitraryNumber.from(bv);
-            return closeEnough(a.divAdd(b, c), a.div(b).add(c));
+            const fused = a.clone().divAdd(b.clone(), c.clone());
+            const stepped = a.clone().div(b.clone()).add(c.clone());
+            return closeEnough(fused, stepped);
         }), { numRuns: 200 });
     });
 });
@@ -213,7 +213,8 @@ describe("property: sumArray ≈ chained add for small arrays", () => {
             fc.array(arbitraryNum, { minLength: 1, maxLength: 8 }),
             (arr) => {
                 const summed = ArbitraryNumber.sumArray(arr);
-                const chained = arr.reduce((acc, n) => acc.add(n), ArbitraryNumber.Zero);
+                // Use a fresh accumulator — don't mutate array elements
+                const chained = arr.reduce((acc, n) => acc.add(n.clone()), ArbitraryNumber.from(0));
                 return closeEnough(summed, chained, 1e-8);
             }), { numRuns: 200 });
     });

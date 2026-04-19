@@ -1,32 +1,23 @@
 import { ArbitraryNumber } from "./ArbitraryNumber";
 import { type Maybe } from "../types/utility";
 
-type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
+type FormulaStep = (value: ArbitraryNumber) => void;
 
 /**
  * A reusable, named pipeline of `ArbitraryNumber` operations.
  *
- * Unlike {@link AnChain}, which executes each step immediately against an
- * accumulated value, `AnFormula` stores the operations as a list of closures
- * and runs them only when {@link apply} is called.  The same formula can be
- * applied to any number of values without re-defining the pipeline.
+ * `AnFormula` stores operations as closures and runs them on `.apply()` or `.applyInPlace()`.
+ * The same formula can be applied to any number of values without re-defining the pipeline.
  *
- * Each builder method returns a **new** `AnFormula` - the original is
- * unchanged.  This makes branching and composition safe:
+ * Each builder method returns a **new** `AnFormula` — the original is unchanged.
  *
  * @example
- * const base      = formula().mul(an(2));
- * const withFloor = base.floor();   // new formula - base is unchanged
- * const withCeil  = base.ceil();    // another branch from base
- *
- * @example
- * // Define once, apply to many values
  * const armorReduction = formula("Armor Reduction")
  *     .subMul(armor, an(0.75))
  *     .floor();
  *
- * const physDamage = armorReduction.apply(physBase);
- * const magDamage  = armorReduction.apply(magBase);
+ * const physDamage = armorReduction.apply(physBase);   // physBase unchanged
+ * armorReduction.applyInPlace(enemyAtk);               // enemyAtk mutated
  *
  * @example
  * // Compose formulas
@@ -34,13 +25,11 @@ type FormulaStep = (value: ArbitraryNumber) => ArbitraryNumber;
  * const full      = armorReduction.then(critBonus);
  * const result    = full.apply(baseDamage);
  */
-export class AnFormula {
+class AnFormula {
     private readonly _name: Maybe<string>;
     private readonly steps: ReadonlyArray<FormulaStep>;
 
-    /**
-     * Prefer the {@link formula} factory function over calling this directly.
-     */
+    /** Prefer the {@link formula} factory function over calling this directly. */
     public constructor(name?: Maybe<string>, steps: ReadonlyArray<FormulaStep> = []) {
         this._name = name;
         this.steps = steps;
@@ -53,19 +42,10 @@ export class AnFormula {
 
     /**
      * Returns a copy of this formula with a new name, leaving the original unchanged.
-     *
-     * @param name - The new name.
-     * @example
-     * const base  = formula().mul(an(2));
-     * const named = base.named("Double");
-     * named.name   // "Double"
-     * base.name    // undefined
      */
     public named(name: string): AnFormula {
         return new AnFormula(name, this.steps);
     }
-
-    // ── Private helper ────────────────────────────────────────────────────────
 
     private step(fn: FormulaStep): AnFormula {
         return new AnFormula(this._name, [...this.steps, fn]);
@@ -84,7 +64,7 @@ export class AnFormula {
     /** Appends `^ exp` to the pipeline. */
     public pow(exp: number): AnFormula { return this.step(v => v.pow(exp)); }
 
-    // ── Fused (avoids one intermediate allocation per call) ───────────────────
+    // ── Fused ─────────────────────────────────────────────────────────────────
 
     /** Appends `(value * mult) + add` to the pipeline. */
     public mulAdd(mult: ArbitraryNumber, add: ArbitraryNumber): AnFormula { return this.step(v => v.mulAdd(mult, add)); }
@@ -101,7 +81,7 @@ export class AnFormula {
 
     /** Appends `abs()` to the pipeline. */
     public abs(): AnFormula { return this.step(v => v.abs()); }
-    /** Appends `neg()` to the pipeline. */
+    /** Appends `negate()` to the pipeline. */
     public neg(): AnFormula { return this.step(v => v.negate()); }
     /** Appends `sqrt()` to the pipeline. */
     public sqrt(): AnFormula { return this.step(v => v.sqrt()); }
@@ -118,11 +98,6 @@ export class AnFormula {
      * Returns a new formula that first applies `this`, then applies `next`.
      *
      * Neither operand is mutated.
-     *
-     * @param next - The formula to apply after `this`.
-     * @example
-     * const full   = armorReduction.then(critBonus);
-     * const result = full.apply(baseDamage);
      */
     public then(next: AnFormula): AnFormula {
         return new AnFormula(this._name, [...this.steps, ...next.steps]);
@@ -131,54 +106,58 @@ export class AnFormula {
     // ── Terminal ──────────────────────────────────────────────────────────────
 
     /**
-     * Runs this formula's pipeline against `value` and returns the result.
+     * Clones `value` once, runs the pipeline against the clone, and returns it.
      *
-     * The formula itself is unchanged - call `apply` as many times as needed.
+     * The original `value` is never mutated.
      *
-     * @param value - The starting value. Plain `number` is coerced via `ArbitraryNumber.from`.
-     * @throws `"ArbitraryNumber.from: value must be finite"` when a plain `number` is non-finite.
      * @example
-     * const damage = damageFormula.apply(baseDamage);
-     * const scaled = damageFormula.apply(boostedBase);
+     * const damage = damageFormula.apply(playerAtk); // playerAtk unchanged
      */
     public apply(value: ArbitraryNumber | number): ArbitraryNumber {
-        let result: ArbitraryNumber = value instanceof ArbitraryNumber
-            ? value
+        const result: ArbitraryNumber = value instanceof ArbitraryNumber
+            ? value.clone()
             : ArbitraryNumber.from(value);
 
         for (const step of this.steps) {
-            result = step(result);
+            step(result);
         }
 
         return result;
+    }
+
+    /**
+     * Runs the pipeline directly against `value`, mutating it in-place.
+     *
+     * Use on hot paths where you don't need to preserve the original value.
+     *
+     * @example
+     * damageFormula.applyInPlace(enemyAtk); // enemyAtk is mutated
+     */
+    public applyInPlace(value: ArbitraryNumber): void {
+        for (const step of this.steps) {
+            step(value);
+        }
     }
 }
 
 /**
  * Creates an {@link AnFormula} pipeline, optionally named.
  *
- * Build the pipeline by chaining methods - each returns a new `AnFormula`
- * so the original is always safe to branch or reuse.  Call {@link AnFormula.apply}
- * to run the pipeline against a value.
+ * Build the pipeline by chaining methods — each returns a new `AnFormula`.
+ * Call {@link AnFormula.apply} or {@link AnFormula.applyInPlace} to run it.
  *
- * @param name - Optional label, available via {@link AnFormula.name} for debugging.
  * @example
  * import { formula, an } from 'arbitrary-numbers';
  *
  * const armorReduction = formula("Armor Reduction")
- *     .subMul(armor, an(0.75))   // (base - armor) * 0.75
+ *     .subMul(armor, an(0.75))
  *     .floor();
  *
- * const critBonus = formula("Crit Bonus").mul(critMult).ceil();
- *
- * // Reuse across many values
  * const physDmg = armorReduction.apply(physBase);
- * const magDmg  = armorReduction.apply(magBase);
- *
- * // Compose
- * const full   = armorReduction.then(critBonus);
- * const result = full.apply(baseDamage);
+ * armorReduction.applyInPlace(tempValue);
  */
-export function formula(name?: Maybe<string>): AnFormula {
+function formula(name?: Maybe<string>): AnFormula {
     return new AnFormula(name, []);
 }
+
+export { AnFormula, formula };

@@ -66,7 +66,7 @@ describe("sqrt()", () => {
     });
 
     it("sqrt(0) returns Zero", () => {
-        expect(ArbitraryNumber.Zero.sqrt().equals(ArbitraryNumber.Zero)).toBe(true);
+        expect(num(0).sqrt().equals(ArbitraryNumber.Zero)).toBe(true);
     });
 
     it("sqrt of negative throws", () => {
@@ -136,7 +136,7 @@ describe("round()", () => {
     });
 
     it("zero returns Zero", () => {
-        expect(ArbitraryNumber.Zero.round().equals(ArbitraryNumber.Zero)).toBe(true);
+        expect(num(0).round().equals(ArbitraryNumber.Zero)).toBe(true);
     });
 
     it("15.7 → 16", () => {
@@ -331,29 +331,29 @@ describe("ArbitraryNumber.lerp()", () => {
 
 describe("ArbitraryNumber.withPrecision()", () => {
     it("restores previous PrecisionCutoff after fn", () => {
-        const prev = ArbitraryNumber.PrecisionCutoff;
+        const prev = ArbitraryNumber.defaults.scaleCutoff;
         ArbitraryNumber.withPrecision(50, () => {
             // inside fn
         });
-        expect(ArbitraryNumber.PrecisionCutoff).toBe(prev);
+        expect(ArbitraryNumber.defaults.scaleCutoff).toBe(prev);
     });
 
     it("uses the new cutoff during fn", () => {
         let cutoffDuring = -1;
         ArbitraryNumber.withPrecision(50, () => {
-            cutoffDuring = ArbitraryNumber.PrecisionCutoff;
+            cutoffDuring = ArbitraryNumber.defaults.scaleCutoff;
         });
         expect(cutoffDuring).toBe(50);
     });
 
     it("restores cutoff even if fn throws", () => {
-        const prev = ArbitraryNumber.PrecisionCutoff;
+        const prev = ArbitraryNumber.defaults.scaleCutoff;
         try {
             ArbitraryNumber.withPrecision(50, () => { throw new Error("test"); });
         } catch {
             // expected
         }
-        expect(ArbitraryNumber.PrecisionCutoff).toBe(prev);
+        expect(ArbitraryNumber.defaults.scaleCutoff).toBe(prev);
     });
 
     it("returns the value from fn", () => {
@@ -363,11 +363,11 @@ describe("ArbitraryNumber.withPrecision()", () => {
 
     it("lower cutoff discards addend that would normally contribute", () => {
         // diff = 6 < default 15 → normally both contribute; with cutoff 5 → small is discarded
-        const big = raw(1.0, 6);
         const small = raw(1.0, 0);
-        const resultDefault = big.add(small);          // both contribute → result > big
-        const resultLowPrecision = ArbitraryNumber.withPrecision(5, () => big.add(small));
-        expect(resultDefault.greaterThan(big)).toBe(true);
-        expect(resultLowPrecision.equals(big)).toBe(true);
+        const resultDefault = raw(1.0, 6).add(small);          // both contribute
+        const bigOriginal = raw(1.0, 6);
+        const resultLowPrecision = ArbitraryNumber.withPrecision(5, () => raw(1.0, 6).add(small));
+        expect(resultDefault.greaterThan(bigOriginal)).toBe(true);
+        expect(resultLowPrecision.equals(bigOriginal)).toBe(true);
     });
 });

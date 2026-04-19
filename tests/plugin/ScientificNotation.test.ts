@@ -152,4 +152,72 @@ describe("ScientificNotation", () => {
             expect(scientificNotation.format(1.5, 0, 2)).toBe("1.50");
         });
     });
+
+    // -----------------------------------------------------------------------
+    // format — extreme ranges (no crash, correct sign, no NaN/Infinity in output)
+    // -----------------------------------------------------------------------
+    describe("format — extreme ranges", () => {
+        it("exponent 1_000_000 — does not crash, correct format", () => {
+            expect(scientificNotation.format(1.5, 1_000_000, 2)).toBe("1.50e+1000000");
+        });
+
+        it("exponent -1_000_000 — does not crash, correct format", () => {
+            expect(scientificNotation.format(1.5, -1_000_000, 2)).toBe("1.50e-1000000");
+        });
+
+        it("exponent 1_000_000 with negative coefficient", () => {
+            expect(scientificNotation.format(-1.5, 1_000_000, 2)).toBe("-1.50e+1000000");
+        });
+
+        it("exponent -1_000_000 with negative coefficient", () => {
+            expect(scientificNotation.format(-1.5, -1_000_000, 2)).toBe("-1.50e-1000000");
+        });
+
+        it("output never contains 'NaN'", () => {
+            const cases = [
+                [1.5, 0], [1.5, 1], [1.5, -1], [1.5, 1e6], [1.5, -1e6],
+                [-1.5, 0], [-9.5, 3], [0, 0],
+            ] as const;
+            for (const [c, e] of cases) {
+                expect(scientificNotation.format(c, e, 2)).not.toContain("NaN");
+            }
+        });
+
+        it("output never contains bare 'Infinity'", () => {
+            const cases = [
+                [1.5, 0], [1.5, 1e6], [1.5, -1e6], [-1.5, 1e6], [9.5, 0],
+            ] as const;
+            for (const [c, e] of cases) {
+                expect(scientificNotation.format(c, e, 2)).not.toContain("Infinity");
+            }
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // format — sign consistency
+    // -----------------------------------------------------------------------
+    describe("format — sign consistency", () => {
+        it("positive coefficient always produces non-negative output", () => {
+            expect(scientificNotation.format(1.5, 5, 2)).not.toMatch(/^-/);
+        });
+
+        it("negative coefficient always produces negative output for e=0", () => {
+            expect(scientificNotation.format(-1.5, 0, 2)).toMatch(/^-/);
+        });
+
+        it("negative coefficient with positive exponent → negative output", () => {
+            expect(scientificNotation.format(-1.5, 3, 2)).toBe("-1.50e+3");
+        });
+
+        it("negative coefficient with negative exponent → negative output", () => {
+            expect(scientificNotation.format(-1.5, -3, 2)).toBe("-1.50e-3");
+        });
+
+        it("zero coefficient → '0.00' regardless of exponent", () => {
+            // ArbitraryNumber normalises zero to coefficient=0, exponent=0
+            // so format(0, 0, 2) is the only realistic call, but guard both
+            expect(scientificNotation.format(0, 0, 2)).toBe("0.00");
+            expect(scientificNotation.format(0, 3, 2)).toBe("0.00e+3");
+        });
+    });
 });

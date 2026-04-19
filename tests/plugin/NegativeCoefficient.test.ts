@@ -169,3 +169,138 @@ describe("negation symmetry across plugins", () => {
         }
     }
 });
+
+// ---------------------------------------------------------------------------
+// Negative coefficient at negative exponents (fractional values)
+// ---------------------------------------------------------------------------
+
+describe("negative coefficient — negative exponents (fractions)", () => {
+    it("scientificNotation: −1.5 × 10^−3 = −0.0015", () => {
+        expect(scientificNotation.format(-1.5, -3, 4)).toBe("-1.5000e-3");
+    });
+
+    it("scientificNotation: −1.5 × 10^−10 — extreme negative exponent", () => {
+        expect(scientificNotation.format(-1.5, -10, 2)).toBe("-1.50e-10");
+    });
+
+    it("scientificNotation: −1.5 × 10^−300 — very extreme", () => {
+        expect(scientificNotation.format(-1.5, -300, 2)).toBe("-1.50e-300");
+    });
+
+    it("letterNotation: neg coefficient, neg exponent → negative decimal", () => {
+        // exponent = -1 → value = -0.15; letterNotation has no suffix tier
+        const result = letterNotation.format(-1.5, -1, 2);
+        expect(result.startsWith("-")).toBe(true);
+        expect(result).not.toContain("NaN");
+        expect(result).not.toContain("Infinity");
+    });
+
+    it("letterNotation: −1.5 × 10^−3 matches negation of positive", () => {
+        const pos = letterNotation.format(1.5, -3, 2);
+        const neg = letterNotation.format(-1.5, -3, 2);
+        expect(neg).toBe(`-${pos}`);
+    });
+
+    it("unitNotation: neg coefficient, neg exponent → negative decimal", () => {
+        const un = new UnitNotation({ units: CLASSIC_UNITS, separator: " " });
+        const result = un.format(-1.5, -1, 4);
+        expect(result.startsWith("-")).toBe(true);
+        expect(result).not.toContain("NaN");
+        expect(result).not.toContain("Infinity");
+    });
+
+    it("unitNotation: −1.5 × 10^−5 matches negation of positive", () => {
+        const un = new UnitNotation({ units: CLASSIC_UNITS, separator: " " });
+        const pos = un.format(1.5, -5, 4);
+        const neg = un.format(-1.5, -5, 4);
+        expect(neg).toBe(`-${pos}`);
+    });
+
+    it("all plugins: output never contains NaN for negative coefficient + negative exponent", () => {
+        const exponents = [-1, -3, -10, -100, -309, -1_000_000];
+        for (const e of exponents) {
+            expect(scientificNotation.format(-1.5, e, 2)).not.toContain("NaN");
+            expect(letterNotation.format(-1.5, e, 2)).not.toContain("NaN");
+            expect(unitNotation.format(-1.5, e, 2)).not.toContain("NaN");
+        }
+    });
+
+    it("all plugins: output never contains Infinity for negative coefficient + negative exponent", () => {
+        const exponents = [-1, -3, -10, -100, -309, -1_000_000];
+        for (const e of exponents) {
+            expect(scientificNotation.format(-1.5, e, 2)).not.toContain("Infinity");
+            expect(letterNotation.format(-1.5, e, 2)).not.toContain("Infinity");
+            expect(unitNotation.format(-1.5, e, 2)).not.toContain("Infinity");
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Negative coefficient — extreme positive exponents (very large negative numbers)
+// ---------------------------------------------------------------------------
+
+describe("negative coefficient — extreme positive exponents", () => {
+    it("scientificNotation: −1.5e+1000000 — no crash", () => {
+        const result = scientificNotation.format(-1.5, 1_000_000, 2);
+        expect(result).toBe("-1.50e+1000000");
+    });
+
+    it("letterNotation: −1.5 at exponent 3000000 — starts with '-', no crash", () => {
+        const result = letterNotation.format(-1.5, 3_000_000, 2);
+        expect(result.startsWith("-")).toBe(true);
+        expect(result).not.toContain("NaN");
+        expect(result).not.toContain("Infinity");
+    });
+
+    it("letterNotation: negation symmetry holds at tier 18279 (aaaa boundary)", () => {
+        const pos = letterNotation.format(1.5, 18279 * 3, 2);
+        const neg = letterNotation.format(-1.5, 18279 * 3, 2);
+        expect(neg).toBe(`-${pos}`);
+    });
+
+    it("unitNotation with fallback: −1.5 at exponent 3000 — starts with '-'", () => {
+        const un = new UnitNotation({ units: CLASSIC_UNITS, fallback: letterNotation, separator: " " });
+        const result = un.format(-1.5, 3000, 2);
+        expect(result.startsWith("-")).toBe(true);
+        expect(result).not.toContain("NaN");
+        expect(result).not.toContain("Infinity");
+    });
+
+    it("all plugins: output never contains NaN for negative coefficient + large exponent", () => {
+        const exponents = [300, 3000, 30000, 300000, 3_000_000];
+        for (const e of exponents) {
+            expect(scientificNotation.format(-1.5, e, 2)).not.toContain("NaN");
+            expect(letterNotation.format(-1.5, e, 2)).not.toContain("NaN");
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// ArbitraryNumber.toString with negative numbers through all plugins
+// ---------------------------------------------------------------------------
+
+describe("ArbitraryNumber.toString — negative numbers via notation plugins", () => {
+    it("scientificNotation: −1.5e6 → '-1.50e+6'", () => {
+        expect(new ArbitraryNumber(-1.5, 6).toString(scientificNotation, 2)).toBe("-1.50e+6");
+    });
+
+    it("letterNotation: −1.5e9 → '-1.50c'", () => {
+        expect(new ArbitraryNumber(-1.5, 9).toString(letterNotation, 2)).toBe("-1.50c");
+    });
+
+    it("unitNotation: −1.5e9 → '-1.50 B'", () => {
+        const un = new UnitNotation({ units: CLASSIC_UNITS, separator: " " });
+        expect(new ArbitraryNumber(-1.5, 9).toString(un, 2)).toBe("-1.50 B");
+    });
+
+    it("negative fraction: −0.0015 via scientificNotation", () => {
+        const n = ArbitraryNumber.from(-0.0015);
+        expect(n.toString(scientificNotation, 2)).toBe("-1.50e-3");
+    });
+
+    it("negative fraction: −0.0015 via letterNotation — starts with '-'", () => {
+        const n = ArbitraryNumber.from(-0.0015);
+        const result = n.toString(letterNotation, 2);
+        expect(result.startsWith("-")).toBe(true);
+    });
+});
