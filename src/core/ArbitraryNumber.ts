@@ -5,6 +5,11 @@ import { type ArbitraryNumberJson, type Nullable } from "../types/utility";
 import { pow10 } from "../constants/pow10";
 import { ArbitraryNumberInputError, ArbitraryNumberDomainError } from "../errors";
 
+// Module-level cache for the hot-path scaleCutoff read.
+// Kept in sync with ArbitraryNumber.defaults.scaleCutoff by withPrecision().
+// Direct mutation of defaults.scaleCutoff bypasses this cache — use withPrecision().
+let _scaleCutoff = 15;
+
 /**
  * Global tunables for `ArbitraryNumber`.
  *
@@ -134,18 +139,22 @@ export class ArbitraryNumber {
     /** @internal Normalise `(c, e)` into `this` (mutates). Returns `this`. */
     private _normalizeInto(c: number, e: number): this {
         if (c === 0) { this.coefficient = 0; this.exponent = 0; return this; }
+
         const abs = c < 0 ? -c : c;
         // Fast path: after add/sub the result is almost always in [0.1, 100).
         if (abs < 10) {
             if (abs >= 1) { this.coefficient = c; this.exponent = e; return this; }
+
             this.coefficient = c * 10; this.exponent = e - 1; return this;
         }
         if (abs < 100) { this.coefficient = c / 10; this.exponent = e + 1; return this; }
         // Slow path: large carry, cancellation to subnormal, or non-finite.
         if (!isFinite(c)) { this.coefficient = 0; this.exponent = 0; return this; }
+
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) { this.coefficient = 0; this.exponent = 0; return this; }
+
         this.coefficient = c / scale;
         this.exponent = e + shift;
         return this;
@@ -253,7 +262,7 @@ export class ArbitraryNumber {
             return this;
         }
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = this.exponent - other.exponent;
         if (diff > cutoff) return this;
         if (diff < -cutoff) {
@@ -297,7 +306,7 @@ export class ArbitraryNumber {
             return this;
         }
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = this.exponent - oe;
         if (diff > cutoff) return this;
         if (diff < -cutoff) {
@@ -395,6 +404,7 @@ export class ArbitraryNumber {
      */
     public abs(): this {
         if (this.coefficient < 0) this.coefficient = -this.coefficient;
+
         return this;
     }
 
@@ -467,7 +477,7 @@ export class ArbitraryNumber {
             return this;
         }
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = ep - ae;
         if (diff > cutoff) {
             this.coefficient = cp;
@@ -508,7 +518,7 @@ export class ArbitraryNumber {
         }
         if (addendC === 0) return; // this is already correct
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = this.exponent - addendE;
         if (diff > cutoff) return;
         if (diff < -cutoff) { this.coefficient = addendC; this.exponent = addendE; return; }
@@ -523,16 +533,20 @@ export class ArbitraryNumber {
         // Inline fast-normalize (same logic as _normalizeInto but without calling it
         // so V8 can see this is a continuation of the same JIT unit).
         if (cs === 0) { this.coefficient = 0; this.exponent = 0; return; }
+
         const abs = cs < 0 ? -cs : cs;
         if (abs < 10) {
             if (abs >= 1) { this.coefficient = cs; this.exponent = es; return; }
+
             this.coefficient = cs * 10; this.exponent = es - 1; return;
         }
         if (abs < 100) { this.coefficient = cs / 10; this.exponent = es + 1; return; }
         if (!isFinite(cs)) { this.coefficient = 0; this.exponent = 0; return; }
+
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) { this.coefficient = 0; this.exponent = 0; return; }
+
         this.coefficient = cs / scale; this.exponent = es + shift;
     }
 
@@ -545,6 +559,7 @@ export class ArbitraryNumber {
         if (multiplier.coefficient === 0) {
             this.coefficient = 0; this.exponent = 0; return this;
         }
+
         // snapshot all args before any write (self-ref safety)
         const ac = addend.coefficient;
         const ae = addend.exponent;
@@ -558,6 +573,7 @@ export class ArbitraryNumber {
         const ep = this.exponent + me;
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; this.coefficient = cp; this.exponent = ep + 1; return this; }
+
         this.coefficient = cp; this.exponent = ep;
         return this;
     }
@@ -587,7 +603,7 @@ export class ArbitraryNumber {
             this.coefficient = cp; this.exponent = ep; return this;
         }
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = ep - se;
         if (diff > cutoff) { this.coefficient = cp; this.exponent = ep; return this; }
         if (diff < -cutoff) { this.coefficient = -sc; this.exponent = se; return this; }
@@ -608,6 +624,7 @@ export class ArbitraryNumber {
         if (multiplier.coefficient === 0) {
             this.coefficient = 0; this.exponent = 0; return this;
         }
+
         // snapshot all args before any write (self-ref safety)
         const sc = subtrahend.coefficient;
         const se = subtrahend.exponent;
@@ -621,6 +638,7 @@ export class ArbitraryNumber {
         const ep = this.exponent + me;
         const absCp = cp < 0 ? -cp : cp;
         if (absCp >= 10) { cp /= 10; this.coefficient = cp; this.exponent = ep + 1; return this; }
+
         this.coefficient = cp; this.exponent = ep;
         return this;
     }
@@ -658,7 +676,7 @@ export class ArbitraryNumber {
             return this;
         }
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         const diff = ed - ae;
         if (diff > cutoff) {
             this.coefficient = cd;
@@ -729,7 +747,7 @@ export class ArbitraryNumber {
         if (len === 0) return ArbitraryNumber.Zero;
         if (len === 1) return numbers[0]!;
 
-        const cutoff = ArbitraryNumber.defaults.scaleCutoff;
+        const cutoff = _scaleCutoff;
         let pivot = -Infinity;
         let total = 0;
 
@@ -742,6 +760,7 @@ export class ArbitraryNumber {
                     const drop = n.exponent - pivot;
                     total = drop > cutoff ? 0 : total / pow10(drop);
                 }
+
                 pivot = n.exponent;
                 total += n.coefficient;
             } else {
@@ -755,12 +774,15 @@ export class ArbitraryNumber {
         const abs = total < 0 ? -total : total;
         if (abs < 10) {
             if (abs >= 1) return ArbitraryNumber.unsafe(total, pivot);
+
             return ArbitraryNumber.unsafe(total * 10, pivot - 1);
         }
         if (abs < 100) return ArbitraryNumber.unsafe(total / 10, pivot + 1);
+
         const shift = Math.floor(Math.log10(abs));
         const scale = pow10(shift);
         if (scale === 0) return ArbitraryNumber.Zero;
+
         return ArbitraryNumber.unsafe(total / scale, pivot + shift);
     }
 
@@ -797,6 +819,7 @@ export class ArbitraryNumber {
      */
     public static maxOfArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         if (numbers.length === 0) return ArbitraryNumber.Zero;
+
         let max = numbers[0]!;
         for (let i = 1; i < numbers.length; i++) {
             if (numbers[i]!.greaterThan(max)) max = numbers[i]!;
@@ -810,6 +833,7 @@ export class ArbitraryNumber {
      */
     public static minOfArray(numbers: ArbitraryNumber[]): ArbitraryNumber {
         if (numbers.length === 0) return ArbitraryNumber.Zero;
+
         let min = numbers[0]!;
         for (let i = 1; i < numbers.length; i++) {
             if (numbers[i]!.lessThan(min)) min = numbers[i]!;
@@ -827,7 +851,7 @@ export class ArbitraryNumber {
      */
     public floor(): this {
         if (this.coefficient === 0) return this;
-        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+        if (this.exponent >= _scaleCutoff) return this;
 
         if (this.exponent < 0) {
             this.coefficient = this.coefficient >= 0 ? 0 : -1;
@@ -845,7 +869,7 @@ export class ArbitraryNumber {
      */
     public ceil(): this {
         if (this.coefficient === 0) return this;
-        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+        if (this.exponent >= _scaleCutoff) return this;
 
         if (this.exponent < 0) {
             const ceiled = this.coefficient > 0 ? 1 : 0;
@@ -867,7 +891,7 @@ export class ArbitraryNumber {
      */
     public round(): this {
         if (this.coefficient === 0) return this;
-        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+        if (this.exponent >= _scaleCutoff) return this;
 
         if (this.exponent < 0) {
             if (this.exponent <= -2) {
@@ -875,6 +899,7 @@ export class ArbitraryNumber {
                 this.exponent = 0;
                 return this;
             }
+
             const rounded = Math.round(this.coefficient * 0.1) || 0; // normalize -0 to +0
             this.coefficient = rounded;
             this.exponent = 0;
@@ -891,7 +916,7 @@ export class ArbitraryNumber {
      */
     public trunc(): this {
         if (this.coefficient === 0) return this;
-        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return this;
+        if (this.exponent >= _scaleCutoff) return this;
         if (this.exponent < 0) {
             this.coefficient = 0;
             this.exponent = 0;
@@ -1090,10 +1115,12 @@ export class ArbitraryNumber {
     public static withPrecision<T>(cutoff: number, fn: () => T): T {
         const prev = ArbitraryNumber.defaults.scaleCutoff;
         ArbitraryNumber.defaults.scaleCutoff = cutoff;
+        _scaleCutoff = cutoff;
         try {
             return fn();
         } finally {
             ArbitraryNumber.defaults.scaleCutoff = prev;
+            _scaleCutoff = prev;
         }
     }
 
@@ -1112,7 +1139,7 @@ export class ArbitraryNumber {
      */
     public isInteger(): boolean {
         if (this.coefficient === 0) return true;
-        if (this.exponent >= ArbitraryNumber.defaults.scaleCutoff) return true;
+        if (this.exponent >= _scaleCutoff) return true;
         if (this.exponent < 0) return false;
 
         return Number.isInteger(this.coefficient * pow10(this.exponent));
@@ -1195,6 +1222,7 @@ export class ArbitraryNumber {
         if (!isFinite(c)) {
             throw new ArbitraryNumberInputError("ArbitraryNumber.fromJSON: c must be finite", c);
         }
+        
         if (!isFinite(e)) {
             throw new ArbitraryNumberInputError("ArbitraryNumber.fromJSON: e must be finite", e);
         }
@@ -1323,7 +1351,6 @@ export class FrozenArbitraryNumber extends ArbitraryNumber {
 }
 
 // Replace bootstrap instances with proper FrozenArbitraryNumber singletons.
-// `as any` bypasses the `readonly` modifier — this is the one-time initialiser.
-(ArbitraryNumber as any).Zero = new FrozenArbitraryNumber(0, 0);
-(ArbitraryNumber as any).One  = new FrozenArbitraryNumber(1, 0);
-(ArbitraryNumber as any).Ten  = new FrozenArbitraryNumber(1, 1);
+(ArbitraryNumber as unknown as Record<string, unknown>).Zero = new FrozenArbitraryNumber(0, 0);
+(ArbitraryNumber as unknown as Record<string, unknown>).One  = new FrozenArbitraryNumber(1, 0);
+(ArbitraryNumber as unknown as Record<string, unknown>).Ten  = new FrozenArbitraryNumber(1, 1);

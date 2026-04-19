@@ -385,6 +385,11 @@ describe("subMul — fused subtract-multiply", () => {
             expect(approxEqual(result, expected)).toBe(true);
         });
 
+        it("same operands: a.subMul(a, a) = (a - a) * a = 0", () => {
+            const a = num(5);
+            expect(a.subMul(a, a).isZero()).toBe(true);
+        });
+
         it("subtrahend=0: (this − 0) × mult = this × mult", () => {
             const result = num(5).subMul(ArbitraryNumber.Zero, num(3));
             expect(approxEqual(result, num(5).mul(num(3)))).toBe(true);

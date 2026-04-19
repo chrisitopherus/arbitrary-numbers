@@ -418,6 +418,28 @@ describe("sumArray() edge cases", () => {
         const batch = ArbitraryNumber.sumArray(values.map(num));
         expect(approxEq(batch, chained)).toBe(true);
     });
+
+    it("reverse-sorted inputs (ascending exponents) produce the same result as sorted", () => {
+        // Adaptive pivot must rescale when a larger exponent appears late in traversal
+        const sorted   = [raw(1, 0), raw(1, 2), raw(1, 4), raw(1, 6), raw(1, 8)];
+        const reversed = [raw(1, 8), raw(1, 6), raw(1, 4), raw(1, 2), raw(1, 0)];
+        const sumSorted   = ArbitraryNumber.sumArray(sorted);
+        const sumReversed = ArbitraryNumber.sumArray(reversed);
+        expect(approxEq(sumSorted, sumReversed)).toBe(true);
+    });
+
+    it("mixed-order inputs match sorted result", () => {
+        const shuffled = [raw(1, 4), raw(1, 0), raw(1, 8), raw(1, 2), raw(1, 6)];
+        const sorted   = [raw(1, 0), raw(1, 2), raw(1, 4), raw(1, 6), raw(1, 8)];
+        expect(approxEq(ArbitraryNumber.sumArray(shuffled), ArbitraryNumber.sumArray(sorted))).toBe(true);
+    });
+
+    it("all elements beyond cutoff of the max — only the max contributes", () => {
+        // max is 1e20; rest are 1e0 — diff = 20 = scaleCutoff, so they are discarded
+        const arr = [raw(1, 20), raw(5, 0), raw(3, 0)];
+        const result = ArbitraryNumber.sumArray(arr);
+        expect(approxEq(result, raw(1, 20))).toBe(true);
+    });
 });
 
 // ---------------------------------------------------------------------------

@@ -258,4 +258,109 @@ describe("UnitNotation", () => {
             expect(n.format(1.5, 33, 2)).toBe("1.50");
         });
     });
+
+    // -----------------------------------------------------------------------
+    // format — negative exponents (all unit notations share SuffixNotationBase path)
+    // -----------------------------------------------------------------------
+    describe("format — negative exponents (no suffix, plain decimal)", () => {
+        it("exponent -1 → decimal 0.20", () => {
+            expect(make().format(2, -1, 2)).toBe("0.20");
+        });
+
+        it("exponent -5 → 0.00 at 2dp (value too small for display precision)", () => {
+            expect(make().format(1.5, -5, 2)).toBe("0.00");
+        });
+
+        it("exponent -5 with 6dp → 0.000015", () => {
+            expect(make().format(1.5, -5, 6)).toBe("0.000015");
+        });
+
+        it("exponent -100 does not crash", () => {
+            expect(() => make().format(1.5, -100, 2)).not.toThrow();
+        });
+
+        it("exponent -309 does not produce NaN or Infinity in output", () => {
+            const result = make().format(1.5, -309, 2);
+            expect(result).not.toContain("NaN");
+            expect(result).not.toContain("Infinity");
+        });
+
+        it("exponent -1000000 does not crash", () => {
+            expect(() => make().format(1.5, -1_000_000, 2)).not.toThrow();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // format — extreme large exponents with fallback
+    // -----------------------------------------------------------------------
+    describe("format — extreme large exponents with letterNotation fallback", () => {
+        it("exponent 306 (one past Ct) → fallback tier 1 → 'a'", () => {
+            // tier=102, lastDefinedTier=101 → fallbackTier=1 → "a"
+            expect(unitNotation.format(1.5, 306, 2)).toBe("1.50 a");
+        });
+
+        it("exponent 3000 → fallback renders a valid multi-letter suffix", () => {
+            // tier=1000 → fallbackTier=1000-101=899 → some letter combination
+            const result = unitNotation.format(1.5, 3000, 2);
+            expect(result).toMatch(/^1\.50 [a-z]+$/);
+            expect(result).not.toBe("1.50 ");
+        });
+
+        it("exponent 30000 → fallback renders valid suffix, no crash", () => {
+            expect(() => unitNotation.format(1.5, 30000, 2)).not.toThrow();
+            const result = unitNotation.format(1.5, 30000, 2);
+            expect(result).toMatch(/^1\.50 [a-z]+$/);
+        });
+
+        it("exponent 300000 → fallback renders valid suffix, no crash", () => {
+            expect(() => unitNotation.format(1.5, 300000, 2)).not.toThrow();
+            const result = unitNotation.format(1.5, 300000, 2);
+            expect(result).toMatch(/^1\.50 [a-z]+$/);
+        });
+
+        it("exponent 3000000 → fallback renders valid suffix, no crash", () => {
+            expect(() => unitNotation.format(1.5, 3_000_000, 2)).not.toThrow();
+            const result = unitNotation.format(1.5, 3_000_000, 2);
+            expect(result).toMatch(/^1\.50 [a-z]+$/);
+        });
+
+        it("output never contains 'NaN' at any tested exponent", () => {
+            const exponents = [0, 1, 2, 3, 6, 9, 303, 306, 309, 3000, 30000, 300000];
+            for (const e of exponents) {
+                expect(unitNotation.format(1.5, e, 2)).not.toContain("NaN");
+            }
+        });
+
+        it("output never contains 'Infinity' at any tested exponent", () => {
+            const exponents = [0, 3, 306, 3000, 30000, 300000, 3_000_000];
+            for (const e of exponents) {
+                expect(unitNotation.format(1.5, e, 2)).not.toContain("Infinity");
+            }
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // format — gap tiers in CLASSIC_UNITS (where no unit is defined for a tier
+    // that is < lastDefinedTier — offsetFallback makes fallbackTier negative)
+    // -----------------------------------------------------------------------
+    describe("CLASSIC_UNITS gap handling", () => {
+        it("exponent 250 (tier 83, a CLASSIC_UNITS gap) — renders without crash", () => {
+            // tier=83, CLASSIC_UNITS[83]=undefined, fallbackTier=83-101=-18 → getSuffix(-18)=""
+            // → plain scaled value: coefficient * displayScale[250%3==1] = 1 * 10 = 10
+            expect(() => unitNotation.format(1, 250, 2)).not.toThrow();
+            const result = unitNotation.format(1, 250, 2);
+            expect(result).not.toContain("NaN");
+            expect(result).not.toContain("Infinity");
+        });
+
+        it("negative coefficient at gap tier — sign is preserved in output", () => {
+            const result = unitNotation.format(-1.5, 3, 2);
+            expect(result).toMatch(/^-/);
+        });
+
+        it("negative coefficient at large exponent — sign is preserved", () => {
+            const result = unitNotation.format(-1.5, 306, 2);
+            expect(result).toMatch(/^-1\.50 a$/);
+        });
+    });
 });

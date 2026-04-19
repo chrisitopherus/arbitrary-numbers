@@ -10,38 +10,71 @@
   [![Zero dependencies](https://img.shields.io/badge/dependencies-zero-6366f1?labelColor=0c0c0e)](package.json)
 </div>
 
-**arbitrary-numbers** — the fast, ergonomic big-number library for idle games, incremental simulators, and anywhere JavaScript's `Number` runs out of precision. Mutable by default for speed, chainable by design, serialization and notation built in.
+**arbitrary-numbers** is a fast, TypeScript-first big-number library for idle games and incremental simulators. It stores numbers as `coefficient × 10^exponent`, mutates in-place for zero allocation on the hot path, and ships with notation plugins and serialization built in.
 
-Numbers are stored as a normalized `coefficient × 10^exponent` pair. Arithmetic mutates and returns `this` — zero allocations on the steady-state path, exactly what tick-based game loops need when values span from `1` to `10^300` in the same frame.
+```
+gold.add(income).sub(cost).mul(multiplier)   // mutates gold, returns gold — zero allocations
+```
 
-- **Mutable by default** — `gold.add(income).sub(cost)` mutates `gold`, no allocations
-- **Opt-in immutability** — `number.freeze()` returns a `FrozenArbitraryNumber` that throws on mutation
-- **Fused operations** (`mulAdd`, `subMul`, `mulDiv`, ...) — one normalisation pass for two-step expressions
-- **Formula pipelines** — define an expression once, `apply()` it to any number of values
-- **Pluggable display** — swap between scientific, unit (K/M/B/T), and letter notation
-- **Save / load built-in** — `toJSON()` / `fromJSON()` / `parse()` for idle-game persistence
-- **Zero dependencies** — nothing to audit, nothing to break
+- **Mutable by default** — no allocations on the steady-state path
+- **Opt-in immutability** — `.freeze()` returns a `FrozenArbitraryNumber` that throws on any mutation
+- **Fused operations** — `mulAdd`, `subMul`, `mulDiv`, … compute two steps in one normalisation pass
+- **Reusable formulas** — define a pipeline once, `apply()` to any value
+- **Notation plugins** — scientific, unit (K/M/B/T), letter (a/b/c), or write your own in 5 lines
+- **Save/load built-in** — `toJSON()` / `fromJSON()` for idle-game persistence
+- **Zero dependencies**
+
+---
+
+## Table of contents
+
+- [How it compares](#how-it-compares)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [The mutable API](#the-mutable-api)
+- [Creating numbers](#creating-numbers)
+- [Arithmetic](#arithmetic)
+- [Fused operations](#fused-operations)
+- [Reusable formulas](#reusable-formulas)
+- [Frozen numbers](#frozen-numbers)
+- [Comparison and predicates](#comparison-and-predicates)
+- [Rounding and math](#rounding-and-math)
+- [Display and notation](#display-and-notation)
+- [Custom notation plugins](#custom-notation-plugins)
+- [Serialization](#serialization)
+- [Precision control](#precision-control)
+- [Utilities](#utilities)
+- [Errors](#errors)
+- [Idle game example](#idle-game-example)
+- [Performance](#performance)
+- [Migration from v1](#migration-from-v1)
+
+---
 
 ## How it compares
 
-| Library | Strengths | Limitations | Pick when |
-|---|---|---|---|
-| **arbitrary-numbers** | TypeScript-first, mutable-fast, fused ops, `sumArray`, formulas, notation plugins, serialization, zero deps | Coefficient is float64 (~15 sig figs) | You want types, speed, ergonomics, and notation flexibility |
-| `break_infinity.js` | Widely used in incremental games, battle-tested | JS only, no types, plugin system is bolt-on | Max community examples and ecosystem matter most |
-| `break_eternity.js` | Handles super-exponent range up to `e(9e15)` | Heavier, more complex API | You genuinely need values beyond `10^(10^15)` |
-| `decimal.js` | Arbitrary *precision* (not just range) | 4–14× slower for game math | Financial math, exact decimal arithmetic |
+| Library | Pick when |
+|---|---|
+| **arbitrary-numbers** | You want TypeScript types, mutable-fast arithmetic, fused ops, notation plugins, and serialization |
+| `break_infinity.js` | Community ecosystem matters most — widely used, battle-tested, but JS-only and immutable |
+| `break_eternity.js` | You genuinely need values beyond `10^(10^15)` |
+| `decimal.js` | You need arbitrary *precision* (financial math, exact decimals) — not just range |
 
-Performance on Node 22, Intel i5-13600KF:
+Performance on Node 22.16, Intel i5-13600KF:
 
-| Operation | arbitrary-numbers v2 | break_infinity.js |
-|---|---|---|
-| `mul` / `div` | ~15 ns | ~12 / ~53 ns |
-| `add` / `sub` | ~30 ns | ~24 ns |
-| `sqrt()` | **~8 ns** | ~11 ns |
-| `compareTo` | **~3 ns** | ~4 ns |
-| `sumArray(50)` | **~180 ns total** | no equivalent |
+| Operation | arbitrary-numbers v2 | break_infinity.js | break_eternity.js | decimal.js |
+|---|---|---|---|---|
+| `add` / `sub` | **~13 ns** | ~28–32 ns | ~150–195 ns | ~134–163 ns |
+| `mul` | **~11 ns** | ~15 ns | ~159 ns | ~380 ns |
+| `div` | **~12 ns** | ~39–47 ns | ~200–249 ns | ~469–843 ns |
+| `sqrt()` | **~11 ns** | ~14 ns | ~32 ns | ~4591 ns |
+| `compareTo` | **~3.6 ns** | ~4.8 ns | ~20 ns | ~79 ns |
+| `clone()` | **~6.7 ns** | ~61 ns | ~73 ns | ~260 ns |
+| `sumArray(50)` | **~156 ns total** | no equivalent | no equivalent | no equivalent |
 
-Full competitor comparison: [`benchmarks/COMPETITOR_BENCHMARKS.md`](benchmarks/COMPETITOR_BENCHMARKS.md).
+Full breakdown: [`benchmarks/COMPETITOR_BENCHMARKS.md`](benchmarks/COMPETITOR_BENCHMARKS.md).
+
+---
 
 ## Install
 
@@ -51,72 +84,44 @@ npm install arbitrary-numbers
 
 Requires TypeScript `"strict": true`.
 
+---
+
 ## Quick start
 
 ```typescript
-import { an, formula, unitNotation } from "arbitrary-numbers";
+import { an, formula, unitNotation, letterNotation, scientificNotation } from "arbitrary-numbers";
 
-// JavaScript range limits
-const jsHuge = Number("1e500");  // Infinity
-const jsTiny = Number("1e-500"); // 0
+// JS overflows — arbitrary-numbers doesn't
+Number("1e500")    // Infinity
+an(1, 500)         // 1.00e+500  — tracked exactly
 
-// Arbitrary range in both directions
-const huge = an(1, 500);
-const tiny = an(1, -500);
-
-// Mutable chaining — gold.add(income) mutates gold, returns gold
-let gold = an(7.5, 12);
-const income = an(2.5, 6);
+// Mutable chaining — all three ops mutate gold, no allocations
+const gold   = an(7.5, 12);   // 7,500,000,000,000
+const income = an(2.5, 9);
 const cost   = an(1.0, 9);
-gold.add(income).sub(cost);   // gold is now 7.501_499_e12
+gold.add(income).sub(cost);
 
-// Reusable per-tick formula: result = (value * 1.08) + 2_500_000
-const tick = formula((an) => {
-    an.mulAdd(new (an.constructor as any)(1.08, 0), new (an.constructor as any)(2.5, 6));
-});
-
-// Use clone() when you need to preserve the original
+// clone() when you need to keep the original
 const before = gold.clone();
-tick.applyInPlace(gold);          // gold mutated in-place
-const gained = gold.clone().sub(before);
+gold.mul(an(1.1, 0));
+// before is unchanged
 
-console.log("=== Range limits (JS vs arbitrary-numbers) ===");
-console.log(`JS Number('1e500')  -> ${jsHuge}`);
-console.log(`AN an(1, 500)       -> ${huge.toString()}`);
-console.log(`JS Number('1e-500') -> ${jsTiny}`);
-console.log(`AN an(1, -500)      -> ${tiny.toString()}`);
-console.log(`\ngold after tick -> ${gold.toString(unitNotation)}`);
+// Notation plugins — swap at any call site
+an(3.2, 15).toString(scientificNotation)  // "3.20e+15"
+an(3.2, 15).toString(unitNotation)        // "3.20 Qa"
+an(3.2, 15).toString(letterNotation)      // "3.20e"
+
+// Reusable formula — define once, apply to many values
+const tick = formula().mulAdd(an(1.08, 0), an(2.5, 6));
+tick.applyInPlace(gold);   // hot path — mutates gold in-place
+const result = tick.apply(gold);  // apply() clones first, gold unchanged
 ```
 
-## Table of contents
+---
 
-- [How it compares](#how-it-compares)
-- [Install](#install)
-- [Quick start](#quick-start)
-- [Table of contents](#table-of-contents)
-- [The mutable API — the most important thing to understand](#the-mutable-api--the-most-important-thing-to-understand)
-- [Creating numbers](#creating-numbers)
-- [Arithmetic](#arithmetic)
-- [Negative numbers](#negative-numbers)
-- [Fused operations](#fused-operations)
-- [Reusable formulas - `formula()`](#reusable-formulas---formula)
-- [Frozen (immutable) numbers](#frozen-immutable-numbers)
-- [Static constants](#static-constants)
-- [Comparison and predicates](#comparison-and-predicates)
-- [Rounding and math](#rounding-and-math)
-- [Serialization and save-load](#serialization-and-save-load)
-- [Display and formatting](#display-and-formatting)
-- [Precision control](#precision-control)
-- [Errors](#errors)
-- [Utilities](#utilities)
-- [Writing a custom plugin](#writing-a-custom-plugin)
-- [Idle game example](#idle-game-example)
-- [Performance](#performance)
-- [Migration from v1](#migration-from-v1)
+## The mutable API
 
-## The mutable API — the most important thing to understand
-
-**Every arithmetic method mutates `this` and returns `this`.** This is different from v1 and from most math libraries.
+**Every arithmetic method mutates `this` and returns `this`.** This is the single most important thing to understand.
 
 ```typescript
 const a = an(3, 6);  // 3,000,000
@@ -125,470 +130,460 @@ const b = an(1, 3);  //     1,000
 a.add(b);   // a is now 3,001,000 — b is unchanged
 ```
 
-This means you can chain naturally:
+Chain operations naturally:
 
 ```typescript
-gold.add(income).sub(cost).mul(multiplier);  // all three ops mutate gold
+gold.add(income).sub(cost).mul(multiplier);  // all ops mutate gold
 ```
 
-**Use `clone()` to preserve a value before mutating it:**
+Use `clone()` to branch:
 
 ```typescript
 const snapshot = gold.clone();
 gold.add(income);
-console.log(`gained ${gold.clone().sub(snapshot).toString()}`);
+// snapshot is still the old value
 ```
 
-**Static methods allocate; instance methods mutate.** This is the one consistent rule:
+**Static methods allocate, instance methods mutate:**
 
 ```typescript
-ArbitraryNumber.add(a, b)  // returns a NEW instance — a and b unchanged
+ArbitraryNumber.add(a, b)  // returns a NEW instance — a and b are unchanged
 a.add(b)                   // mutates a, returns a
 ```
 
-The aliasing footgun to watch out for:
+Watch out for aliasing:
 
 ```typescript
-const total = gold;    // alias — NOT a copy!
-total.add(income);     // mutates gold too, because total === gold
-// Fix:
-const total = gold.clone();
-total.add(income);     // gold unchanged
+const total = gold;        // alias — NOT a copy
+total.add(income);         // mutates gold too!
+
+const total = gold.clone(); // correct — independent copy
+total.add(income);          // gold is unchanged
 ```
+
+---
 
 ## Creating numbers
 
 ```typescript
 import { ArbitraryNumber, an } from "arbitrary-numbers";
 
-// From a coefficient and exponent (already normalised)
-new ArbitraryNumber(1.5, 3)   // 1,500       { coefficient: 1.5, exponent: 3 }
-new ArbitraryNumber(15, 3)    // 15,000  ->  { coefficient: 1.5, exponent: 4 }  (normalised)
-new ArbitraryNumber(0, 99)    // Zero    ->  { coefficient: 0,   exponent: 0 }
+new ArbitraryNumber(1.5, 3)    // 1,500        { coefficient: 1.5, exponent: 3 }
+new ArbitraryNumber(15, 3)     // normalised → { coefficient: 1.5, exponent: 4 }
+new ArbitraryNumber(0, 99)     // zero     →  { coefficient: 0,   exponent: 0 }
 
-// From a plain JS number
 ArbitraryNumber.from(1_500_000)  // { coefficient: 1.5, exponent: 6 }
 ArbitraryNumber.from(0.003)      // { coefficient: 3,   exponent: -3 }
 
-// Shorthand
-an(1.5, 6)      // same as new ArbitraryNumber(1.5, 6)
-an.from(1_500)  // same as ArbitraryNumber.from(1500)
+an(1.5, 6)       // shorthand for new ArbitraryNumber(1.5, 6)
+an.from(1_500)   // shorthand for ArbitraryNumber.from(1500)
 
-// Copy
-an(1.5, 6).clone()  // fresh unfrozen copy — the safe way to branch
+an(1.5, 6).clone()  // fresh mutable copy
 ```
 
-Inputs must be finite. `NaN`, `Infinity`, and `-Infinity` throw `ArbitraryNumberInputError`:
+Non-finite inputs throw `ArbitraryNumberInputError`:
 
 ```typescript
-ArbitraryNumber.from(Infinity)     // throws ArbitraryNumberInputError  { value: Infinity }
-new ArbitraryNumber(NaN, 0)        // throws ArbitraryNumberInputError  { value: NaN }
-new ArbitraryNumber(1, Infinity)   // throws ArbitraryNumberInputError  { value: Infinity }
+ArbitraryNumber.from(Infinity)   // throws
+new ArbitraryNumber(NaN, 0)      // throws
 ```
+
+---
 
 ## Arithmetic
 
-All instance arithmetic **mutates `this`** and **returns `this`**. All static arithmetic returns a new instance.
+All instance methods mutate `this` and return `this`. Static methods return a new instance.
 
 ```typescript
-const a = an(3, 6);  // 3,000,000
-const b = an(1, 3);  //     1,000
+const a = an(3, 6);
+const b = an(1, 3);
 
-// Instance — mutates a, returns a
-a.add(b)    // a = 3,001,000
-a.sub(b)    // a = 3,000,000  (undoes the add if b is the same)
-a.mul(b)    // a = 3,000,000,000
-a.div(b)    // a = 3,000
-a.pow(2)    // a = 9,000,000
-a.negate()  // a = -9,000,000
-a.abs()     //  a = 9,000,000
+// instance — mutates a
+a.add(b)    a.sub(b)    a.mul(b)    a.div(b)
+a.pow(2)    a.negate()  a.abs()
 
-// Static — allocates a new instance
-ArbitraryNumber.add(a, b)   // new instance, a and b unchanged
-ArbitraryNumber.sub(a, b)   // new instance
-ArbitraryNumber.mul(a, b)   // new instance
-ArbitraryNumber.div(a, b)   // new instance
+// static — new instance, a and b unchanged
+ArbitraryNumber.add(a, b)
+ArbitraryNumber.sub(a, b)
+ArbitraryNumber.mul(a, b)
+ArbitraryNumber.div(a, b)
 ```
 
-## Negative numbers
-
-All operations support negative coefficients. The sign is carried in the coefficient — the exponent is always the magnitude.
+Negative numbers are fully supported — the sign lives in the coefficient:
 
 ```typescript
-const debt   = an(-5, 6);   // -5,000,000
-const income = an(2, 6);    //  2,000,000
-
-debt.clone().add(income)  // -3,000,000  (clone so debt is unchanged)
-debt.clone().abs()        //  5,000,000
-debt.clone().negate()     //  5,000,000
-debt.sign()               // -1
-debt.isNegative()         // true
-
-// Notation plugins preserve the sign
-import { unitNotation, letterNotation, scientificNotation } from "arbitrary-numbers";
-
-an(-1.5, 6).toString(scientificNotation) // "-1.50e+6"
-an(-1.5, 6).toString(unitNotation)       // "-1.50 M"
-an(-1.5, 6).toString(letterNotation)     // "-1.50b"
+const debt = an(-5, 6);   // -5,000,000
+debt.clone().abs()         //  5,000,000
+debt.clone().negate()      //  5,000,000
+debt.sign()                // -1
+debt.isNegative()          // true
 ```
+
+---
 
 ## Fused operations
 
-Fused methods compute a two-step expression in one normalisation pass. Because v2 is already mutation-based, the primary win is fewer intermediate allocations and one less normalisation call.
+Fused methods compute a two-step expression in one normalisation pass — fewer intermediate steps, one less allocation compared to chaining two separate ops.
 
 ```typescript
-// (gold * rate) + bonus  — one normalisation pass
-gold.mulAdd(prestigeRate, prestigeBonus);   // mutates gold
-
-// Other fused pairs
-base.addMul(bonus, multiplier);          // (base + bonus) * multiplier
-income.mulSub(rate, upkeep);             // (income * rate) - upkeep
-raw.subMul(reduction, boost);            // (raw - reduction) * boost
-damage.divAdd(speed, flat);              // (damage / speed) + flat
-production.mulDiv(deltaTime, cost);      // (production * deltaTime) / cost
-
-// Batch sum — one pass, no intermediate instances
-const total = ArbitraryNumber.sumArray(incomeSources);   // ~3.6 ns/element
-
-// Batch product
-const product = ArbitraryNumber.productArray(multipliers);
+gold.mulAdd(rate, bonus)          // (gold × rate) + bonus
+base.addMul(bonus, multiplier)    // (base + bonus) × multiplier
+income.mulSub(rate, upkeep)       // (income × rate) − upkeep
+raw.subMul(reduction, boost)      // (raw − reduction) × boost
+damage.divAdd(speed, flat)        // (damage / speed) + flat
+production.mulDiv(dt, cost)       // (production × dt) / cost
 ```
 
-Note: operands passed to fused methods are only read, never mutated. Only `this` changes.
+Operands are only read, never mutated. Only `this` changes.
 
-## Reusable formulas - `formula()`
+Batch operations that avoid intermediate instances entirely:
 
-`formula()` builds a reusable pipeline. `apply()` clones the input and runs the steps on the clone; `applyInPlace()` runs the steps directly on the passed instance.
+```typescript
+ArbitraryNumber.sumArray(sources)        // sum of an array — ~3.1 ns/element
+ArbitraryNumber.productArray(multipliers)  // product of an array
+```
+
+---
+
+## Reusable formulas
+
+`formula()` builds a chainable pipeline. Steps are stored as closures and replayed on each application.
 
 ```typescript
 import { formula, an } from "arbitrary-numbers";
 
-const armorReduction = formula((an) => {
-    an.subMul(armor, an(0.75, 0));  // (base - armor) * 0.75
-    an.floor();
-});
+// Build once
+const armorReduction = formula()
+    .subMul(armor, an(0.75, 0))  // (base − armor) × 0.75
+    .floor();
 
-// apply() — input is unchanged, returns a new instance
+// apply() — clones the input, returns a new instance
 const physDamage = armorReduction.apply(physBase);
 const magDamage  = armorReduction.apply(magBase);
 
-// applyInPlace() — mutates the passed instance directly (hot path)
-armorReduction.applyInPlace(enemyAtk);   // enemyAtk is now the reduced value
+// applyInPlace() — mutates the passed instance directly (hot path, no clone)
+armorReduction.applyInPlace(enemyAtk);
 ```
 
-Compose two formulas with `then()`:
+Compose with `then()`:
 
 ```typescript
-const critBonus = formula((an) => { an.mul(an(1.5, 0)).ceil(); });
-const full      = armorReduction.then(critBonus);
-const result    = full.apply(baseDamage);
+const withCrit = armorReduction.then(formula().mul(critMult).ceil());
+const result   = withCrit.apply(baseDamage);
 ```
 
-You can store a formula as a typed property:
+Type a formula as a property:
 
 ```typescript
 import type { AnFormula } from "arbitrary-numbers";
 
 class DamageSystem {
-    private readonly physFormula: AnFormula;
+    private readonly formula: AnFormula;
     constructor(armor: ArbitraryNumber) {
-        this.physFormula = formula((an) => { an.subMul(armor, an(0.75, 0)).floor(); });
+        this.formula = formula().subMul(armor, an(0.75, 0)).floor();
     }
     calculate(base: ArbitraryNumber): ArbitraryNumber {
-        return this.physFormula.apply(base);
+        return this.formula.apply(base);
     }
 }
 ```
 
-## Frozen (immutable) numbers
+---
 
-Call `.freeze()` to get a `FrozenArbitraryNumber` — same API, but all mutating methods throw `ArbitraryNumberMutationError`.
+## Frozen numbers
+
+`.freeze()` returns a `FrozenArbitraryNumber` — identical API, but every mutating method throws `ArbitraryNumberMutationError`.
 
 ```typescript
-import { ArbitraryNumber, FrozenArbitraryNumber, ArbitraryNumberMutationError } from "arbitrary-numbers";
+import { ArbitraryNumber, FrozenArbitraryNumber } from "arbitrary-numbers";
 
 const base = an(1.5, 6).freeze();
+base.add(an(1));  // throws ArbitraryNumberMutationError: "add"
 
-base.add(an(1));  // throws ArbitraryNumberMutationError
-
-// Unfreeze with clone()
-const mutable = base.clone();
+// Escape with clone()
+const mutable = base.clone();  // plain ArbitraryNumber, fully mutable
 mutable.add(an(1));  // ok
 ```
 
-The three static constants (`ArbitraryNumber.Zero`, `.One`, `.Ten`) are frozen — mutating them throws. Use `.clone()` or `an(0)` / `an(1)` / `an(10)` when you need a mutable starting point:
+The three static constants are frozen — use `an(0)` / `an(1)` / `an(10)` when you need a mutable starting point:
 
 ```typescript
-// Wrong — Zero is frozen
-ArbitraryNumber.Zero.add(income);  // throws!
+ArbitraryNumber.Zero  // FrozenArbitraryNumber — read only
+ArbitraryNumber.One   // FrozenArbitraryNumber — read only
+ArbitraryNumber.Ten   // FrozenArbitraryNumber — read only
 
-// Right
-const total = an(0);
-total.add(income);  // ok
+ArbitraryNumber.Zero.add(income)  // throws!
+an(0).add(income)                 // ok
 ```
 
-## Static constants
-
-```typescript
-ArbitraryNumber.Zero  // FrozenArbitraryNumber(0)  — read-only
-ArbitraryNumber.One   // FrozenArbitraryNumber(1)  — read-only
-ArbitraryNumber.Ten   // FrozenArbitraryNumber(10) — read-only
-```
-
-Use these for comparisons and reads. Never pass them as the receiver of a mutating call.
+---
 
 ## Comparison and predicates
 
-These methods are **read-only** — they never mutate.
+These never mutate.
 
 ```typescript
 const a = an(1, 4);  // 10,000
 const b = an(9, 3);  //  9,000
 
-a.compareTo(b)           //  1  (compatible with Array.sort)
+a.compareTo(b)           //  1   (compatible with Array.sort)
 a.greaterThan(b)         // true
 a.lessThan(b)            // false
 a.greaterThanOrEqual(b)  // true
-a.lessThanOrEqual(b)     // false
 a.equals(b)              // false
 
-a.isZero()               // false
-a.isPositive()           // true
-a.isNegative()           // false
-a.isInteger()            // true
-a.sign()                 //  1  (-1 | 0 | 1)
+a.isZero()      // false
+a.isPositive()  // true
+a.isNegative()  // false
+a.isInteger()   // true
+a.sign()        //  1   (-1 | 0 | 1)
 
-ArbitraryNumber.min(a, b)              // b   (returns the input reference — no clone)
-ArbitraryNumber.max(a, b)              // a
-ArbitraryNumber.clamp(an(5, 5), a, b)  // b   (clamped to max)
+ArbitraryNumber.min(a, b)              // b  (returns the input reference — no clone)
+ArbitraryNumber.max(a, b)             // a
+ArbitraryNumber.clamp(an(5, 5), a, b)  // b  (clamped to max)
 ArbitraryNumber.lerp(a, b, 0.5)        // new instance — midpoint
-ArbitraryNumber.lerp(a, b, 0)          // a   (exact reference — no computation)
-ArbitraryNumber.lerp(a, b, 1)          // b   (exact reference — no computation)
 ```
 
 `min`, `max`, `clamp` return one of the original references — they do not clone.
+
+---
 
 ## Rounding and math
 
 These mutate `this` and return `this`.
 
 ```typescript
-const n = an(1.75, 0);  // 1.75
+an(1.75, 0).clone().floor()   //  1
+an(1.75, 0).clone().ceil()    //  2
+an(1.75, 0).clone().round()   //  2
+an(1.75, 0).clone().trunc()   //  1
+an(-1.75, 0).clone().floor()  // -2  (toward −∞)
+an(-1.75, 0).clone().trunc()  // -1  (toward 0)
 
-n.floor()   //  1  (toward -∞)
-n.ceil()    //  2  (toward +∞)
-n.round()   //  2  (half-up)
-n.trunc()   //  1  (toward 0)
+an(4, 0).clone().sqrt()   // 2
+an(8, 0).clone().cbrt()   // 2
+an(-27, 0).clone().cbrt() // -3   (cube root supports negatives)
 
-an(-1.75, 0).floor()  // -2  (toward -∞)
-an(-1.75, 0).trunc()  // -1  (toward 0, unlike floor)
+an(1, 3).log10()           //  3
+an(1024, 0).log(2)         // 10
+an(Math.E, 0).ln()         //  ≈ 1
+ArbitraryNumber.exp10(6)   // 1e6  (new instance)
 
-an(4, 0).sqrt()   // 2  (~8 ns — faster than .pow(0.5))
-an(1, 4).sqrt()   // 100
-an(-4, 0).sqrt()  // throws ArbitraryNumberDomainError
-
-an(8, 0).cbrt()              // 2
-an(1, 9).cbrt()              // 1e3
-an(-27, 0).cbrt()            // -3   (cube root supports negatives)
-
-an(1, 3).log10()             // 3
-an(1.5, 3).log10()           // 3.176...
-an(1024, 0).log(2)           // 10
-an(Math.E, 0).ln()           // ≈ 1
-
-ArbitraryNumber.exp10(6)     // 1e6  (new instance — inverse of log10)
-ArbitraryNumber.exp10(3.5)   // ≈ 3162.3
-
-an(1.5, 3).toNumber()        // 1500
-an(1, 400).toNumber()        // Infinity  (exponent beyond float64 range)
-
-// Batch
-ArbitraryNumber.productArray([an(2), an(3), an(4)])   // 24   (new instance)
-ArbitraryNumber.maxOfArray([an(1), an(3), an(2)])     // an(3) (input reference)
-ArbitraryNumber.minOfArray([an(3), an(1), an(2)])     // an(1) (input reference)
+an(1, 400).toNumber()      // Infinity  (beyond float64)
 ```
 
-## Serialization and save-load
+---
 
-Idle games need to persist numbers across sessions. `arbitrary-numbers` provides three serialization paths.
+## Display and notation
 
-### JSON (recommended for save files)
+`toString(plugin?, decimals?)` accepts any `NotationPlugin`. Three are included:
 
 ```typescript
-import { ArbitraryNumber, an } from "arbitrary-numbers";
+import {
+    scientificNotation,   // default
+    unitNotation,         // K / M / B / T / Qa …
+    letterNotation,       // a / b / c … aa / ab …
+} from "arbitrary-numbers";
 
-const gold = an(1.5, 6);
+const n = an(3.2, 15);  // 3,200,000,000,000,000
 
-// Serialize — produces { c: number, e: number }
-const blob = gold.toJSON();           // { c: 1.5, e: 6 }
-const json = JSON.stringify(gold);    // '{"c":1.5,"e":6}'
-
-// Deserialize — always returns a fresh mutable instance
-const restored = ArbitraryNumber.fromJSON(JSON.parse(json));
-restored.equals(gold);  // true
+n.toString()                         // "3.20e+15"   (scientificNotation)
+n.toString(scientificNotation, 4)    // "3.2000e+15"
+n.toString(unitNotation)             // "3.20 Qa"
+n.toString(letterNotation)           // "3.20e"
 ```
 
-`toJSON()` uses short keys (`c`/`e`) to keep save blobs small. The shape is stable across versions.
-
-### Compact string (URL params, cookies)
+**Unit notation** comes with two built-in unit lists:
 
 ```typescript
-const raw = gold.toRaw();             // "1.5|6"
-const restored = ArbitraryNumber.parse("1.5|6");
-restored.equals(gold);  // true
+import { UnitNotation, CLASSIC_UNITS, COMPACT_UNITS, letterNotation } from "arbitrary-numbers";
+
+// CLASSIC_UNITS: K, M, B, T, Qa, Qi … Ct (centillion)
+// COMPACT_UNITS: k, M, B, T, Qa, Qi … No
+// fallback kicks in for values beyond the list
+
+const display = new UnitNotation({ units: CLASSIC_UNITS, fallback: letterNotation });
+an(3.2, 6).toString(display)    // "3.20 M"
+an(3.2, 303).toString(display)  // "3.20 Ct"
+an(3.2, 400).toString(display)  // "3.20e" (falls back to letterNotation)
 ```
 
-### Parsing arbitrary strings
-
-`ArbitraryNumber.parse()` accepts multiple formats:
+**Letter notation** — suffixes never run out (`a`–`z`, then `aa`–`zz`, then `aaa`, …):
 
 ```typescript
-ArbitraryNumber.parse("1.5|6")      // pipe format  (exact round-trip)
-ArbitraryNumber.parse("1.5e+6")     // scientific notation
-ArbitraryNumber.parse("1500000")    // plain decimal
-ArbitraryNumber.parse("-0.003")     // negative decimal
-ArbitraryNumber.parse("1.5E6")      // uppercase E
-```
-
-Unrecognised or non-finite strings throw `ArbitraryNumberInputError`.
-
-### Save-every-60s pattern
-
-```typescript
-// Save
-function saveGame(state: GameState): string {
-    return JSON.stringify({
-        gold: state.gold.toJSON(),
-        gps:  state.gps.toJSON(),
-        tick: state.tick,
-    });
-}
-
-// Load
-function loadGame(json: string): GameState {
-    const raw = JSON.parse(json);
-    return {
-        gold: ArbitraryNumber.fromJSON(raw.gold),
-        gps:  ArbitraryNumber.fromJSON(raw.gps),
-        tick: raw.tick,
-    };
-}
-
-setInterval(() => localStorage.setItem("save", saveGame(state)), 60_000);
-```
-
-## Display and formatting
-
-`toString(plugin?, decimals?)` accepts any `NotationPlugin`. Three plugins are included.
-
-### scientificNotation (default)
-
-```typescript
-import { scientificNotation } from "arbitrary-numbers";
-
-an(1.5, 3).toString()                      // "1.50e+3"
-an(1.5, 3).toString(scientificNotation, 4) // "1.5000e+3"
-an(1.5, 0).toString()                      // "1.50"
-```
-
-### unitNotation - K, M, B, T...
-
-```typescript
-import { unitNotation, UnitNotation, COMPACT_UNITS, letterNotation } from "arbitrary-numbers";
-
-an(1.5, 3).toString(unitNotation)  // "1.50 K"
-an(3.2, 6).toString(unitNotation)  // "3.20 M"
-an(1.0, 9).toString(unitNotation)  // "1.00 B"
-
-// Custom unit list with a fallback for values beyond the list
-const custom = new UnitNotation({ units: COMPACT_UNITS, fallback: letterNotation });
-```
-
-### AlphabetNotation - a, b, c... aa, ab...
-
-```typescript
-import { letterNotation, AlphabetNotation, alphabetSuffix } from "arbitrary-numbers";
-
 an(1.5, 3).toString(letterNotation)   // "1.50a"
 an(1.5, 6).toString(letterNotation)   // "1.50b"
 an(1.5, 78).toString(letterNotation)  // "1.50z"
 an(1.5, 81).toString(letterNotation)  // "1.50aa"
 ```
 
-Suffixes never run out: `a-z`, then `aa-zz`, then `aaa`, and so on.
+---
 
-Pass a custom alphabet:
+## Custom notation plugins
 
-```typescript
-const excelNotation = new AlphabetNotation({ alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ" });
-
-an(1.5, 3).toString(excelNotation)   // "1.50A"
-an(1.5, 78).toString(excelNotation)  // "1.50Z"
-an(1.5, 81).toString(excelNotation)  // "1.50AA"
-```
-
-`alphabetSuffix(tier, alphabet?)` exposes the suffix algorithm as a standalone function:
+Any object with `format(coefficient, exponent, decimals)` is a valid plugin — you have complete control over how numbers render:
 
 ```typescript
-import { alphabetSuffix } from "arbitrary-numbers";
+import type { NotationPlugin } from "arbitrary-numbers";
 
-alphabetSuffix(1)                                // "a"
-alphabetSuffix(27)                               // "aa"
-alphabetSuffix(27, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") // "AA"
+// Simple inline plugin — no class needed
+const romanTiers: NotationPlugin = {
+    format(coefficient, exponent, decimals) {
+        const tiers = ["", "K", "M", "B", "T", "Qa", "Qi"];
+        const tier  = Math.floor(exponent / 3);
+        const value = coefficient * 10 ** (exponent - tier * 3);
+        return `${value.toFixed(decimals)}${tiers[tier] ?? `e+${tier * 3}`}`;
+    },
+};
+
+an(1.5, 3).toString(romanTiers)   // "1.50K"
+an(1.5, 6).toString(romanTiers)   // "1.50M"
+an(1.5, 21).toString(romanTiers)  // "1.50e+21"
 ```
+
+For tier-based suffix patterns, extend `SuffixNotationBase` — it handles the `coefficient × 10^(exponent mod 3)` scaling for you and lets you focus on just the suffix:
+
+```typescript
+import { SuffixNotationBase } from "arbitrary-numbers";
+
+class GameNotation extends SuffixNotationBase {
+    // Any suffix scheme you want — Japanese units, emoji, roman numerals, …
+    private static readonly TIERS = ["", "万", "億", "兆", "京", "垓"];
+    getSuffix(tier: number): string {
+        return GameNotation.TIERS[tier] ?? `e+${tier * 3}`;
+    }
+}
+
+const jp = new GameNotation({ separator: "" });
+an(1.5, 3).toString(jp)   // "1.50万"
+an(3.2, 6).toString(jp)   // "3.20億"
+```
+
+The `AlphabetNotation` class (backing `letterNotation`) is also customisable:
+
+```typescript
+import { AlphabetNotation, alphabetSuffix } from "arbitrary-numbers";
+
+const excelColumns = new AlphabetNotation({ alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ" });
+an(1.5, 3).toString(excelColumns)   // "1.50A"
+an(1.5, 78).toString(excelColumns)  // "1.50Z"
+an(1.5, 81).toString(excelColumns)  // "1.50AA"
+
+// The suffix algorithm is also available standalone
+alphabetSuffix(1)   // "a"
+alphabetSuffix(27)  // "aa"
+```
+
+---
+
+## Serialization
+
+Three paths for idle-game save files:
+
+```typescript
+const gold = an(1.5, 6);
+
+// JSON — recommended, compact keys (c/e), stable across versions
+gold.toJSON()                      // { c: 1.5, e: 6 }
+JSON.stringify(gold)               // '{"c":1.5,"e":6}'
+ArbitraryNumber.fromJSON({ c: 1.5, e: 6 })  // restores
+
+// Pipe string — for URL params, cookies
+gold.toRawString()                 // "1.5|6"
+ArbitraryNumber.parse("1.5|6")    // restores
+
+// parse() accepts multiple input formats
+ArbitraryNumber.parse("1.5e+6")   // scientific
+ArbitraryNumber.parse("1500000")  // plain decimal
+ArbitraryNumber.parse("-0.003")   // negative
+```
+
+Save-every-60s pattern:
+
+```typescript
+// Save
+function save(state: GameState): string {
+    return JSON.stringify({
+        gold: state.gold.toJSON(),
+        gps:  state.gps.toJSON(),
+    });
+}
+
+// Load
+function load(json: string): GameState {
+    const raw = JSON.parse(json);
+    return {
+        gold: ArbitraryNumber.fromJSON(raw.gold),
+        gps:  ArbitraryNumber.fromJSON(raw.gps),
+    };
+}
+
+setInterval(() => localStorage.setItem("save", save(state)), 60_000);
+```
+
+---
 
 ## Precision control
 
-When two numbers differ in exponent by more than `defaults.scaleCutoff` (default `15`), the smaller operand is silently discarded because its contribution is below floating-point resolution:
+When two numbers differ in exponent by more than `defaults.scaleCutoff` (default `15`), the smaller operand is discarded — its contribution is below float64 resolution:
 
 ```typescript
 const huge = an(1, 20);  // 10^20
-const tiny = an(1, 3);   // 1,000
+const tiny = an(1, 3);   //  1,000
 
-huge.clone().add(tiny)  // returns huge value unchanged — tiny is negligible at 10^20 scale
+huge.clone().add(tiny)  // unchanged — tiny is negligible at this scale
 ```
 
-Override globally or for a single scoped block:
+Override globally or in a scoped block:
 
 ```typescript
 ArbitraryNumber.defaults.scaleCutoff = 50;  // global
 
-// Scoped - scaleCutoff is restored after fn, even on throw
+// Scoped — restored after fn, even on throw
 const result = ArbitraryNumber.withPrecision(50, () => a.clone().add(b));
 ```
 
-### When things drift — precision troubleshooting
+---
 
-**"Why doesn't `a.clone().add(b).sub(b).equals(a)` return true when `b` is much larger than `a`?"**
+## Utilities
 
-```typescript
-const a = an(1, 3);   // 1,000
-const b = an(1, 20);  // 10^20
-
-const r = a.clone().add(b);    // r = b's value — a was negligible, discarded
-r.sub(b);                       // r = 0, not a
-r.equals(a);                    // false — a was lost when added to b
-```
-
-This is the fundamental float64 limitation: `1,000 + 10^20 = 10^20` in any system with ~15 significant digits. If exact addition across large exponent gaps matters, raise `scaleCutoff`:
+### ArbitraryNumberGuard — type guards
 
 ```typescript
-ArbitraryNumber.defaults.scaleCutoff = 50;
+import { ArbitraryNumberGuard as guard } from "arbitrary-numbers";
+
+guard.isArbitraryNumber(value)    // true when value instanceof ArbitraryNumber
+guard.isNormalizedNumber(value)   // true when value has numeric coefficient + exponent
+guard.isZero(value)               // true when value is an ArbitraryNumber with coefficient 0
 ```
 
-> **Warning:** `defaults.scaleCutoff` is a global. Changing it affects all arithmetic library-wide. Use `withPrecision` for scoped overrides.
+### ArbitraryNumberHelpers — game patterns
+
+```typescript
+import { ArbitraryNumberHelpers as helpers } from "arbitrary-numbers";
+
+helpers.meetsOrExceeds(gold, cost)              // gold >= cost
+helpers.wholeMultipleCount(gold, cost)          // how many can you afford?
+helpers.subtractWithFloor(health, damage)       // max(health − damage, 0)
+helpers.subtractWithFloor(health, damage, min)  // max(health − damage, min)
+```
+
+All helpers accept `number | ArbitraryNumber` and never mutate their arguments.
+
+---
 
 ## Errors
 
 All errors extend `ArbitraryNumberError`.
 
+| Class | Thrown when |
+|---|---|
+| `ArbitraryNumberInputError` | Non-finite input (NaN, Infinity) to constructor or factory. `.value: number` |
+| `ArbitraryNumberDomainError` | Mathematically undefined operation (div by zero, sqrt of negative). `.context: Record<string, number>` |
+| `ArbitraryNumberMutationError` | Mutating method called on a frozen instance |
+
 ```typescript
-import {
-    ArbitraryNumberError,
-    ArbitraryNumberInputError,
-    ArbitraryNumberDomainError,
-    ArbitraryNumberMutationError,
-} from "arbitrary-numbers";
+import { ArbitraryNumberDomainError } from "arbitrary-numbers";
 
 try {
     an(1).div(an(0));
@@ -599,171 +594,104 @@ try {
 }
 ```
 
-| Class | Thrown when | Extra property |
-|---|---|---|
-| `ArbitraryNumberInputError` | Non-finite input to a constructor or factory | `.value: number` |
-| `ArbitraryNumberDomainError` | Mathematically undefined operation (div-by-zero, sqrt of negative, ...) | `.context: Record<string, number>` |
-| `ArbitraryNumberMutationError` | A mutating method is called on a frozen instance | — |
-
-## Utilities
-
-### ArbitraryNumberGuard - type guards
-
-```typescript
-import { ArbitraryNumberGuard as guard } from "arbitrary-numbers";
-
-guard.isArbitraryNumber(value)   // true when value instanceof ArbitraryNumber
-guard.isZero(value)              // true when value is ArbitraryNumber with coefficient 0
-```
-
-### ArbitraryNumberHelpers - game and simulation patterns
-
-```typescript
-import { ArbitraryNumberHelpers as helpers } from "arbitrary-numbers";
-
-helpers.meetsOrExceeds(gold, upgradeCost)             // true when gold >= upgradeCost
-helpers.wholeMultipleCount(gold, upgradeCost)          // how many upgrades can you afford?
-helpers.subtractWithFloor(health, damage)              // max(health - damage, 0)
-helpers.subtractWithFloor(health, damage, minHealth)   // max(health - damage, minHealth)
-```
-
-All helpers accept `number | ArbitraryNumber` as input and do not mutate their arguments.
-
-## Writing a custom plugin
-
-Any object with a `format(coefficient, exponent, decimals)` method is a valid `NotationPlugin`:
-
-```typescript
-import type { NotationPlugin } from "arbitrary-numbers";
-
-const emojiNotation: NotationPlugin = {
-    format(coefficient, exponent, decimals) {
-        const tiers = ["", "K", "M", "B", "T", "Qa", "Qi"];
-        const tier    = Math.floor(exponent / 3);
-        const display = coefficient * 10 ** (exponent - tier * 3);
-        return `${display.toFixed(decimals)}${tiers[tier] ?? `e+${tier * 3}`}`;
-    },
-};
-
-an(1.5, 3).toString(emojiNotation)  // "1.50K"
-an(1.5, 6).toString(emojiNotation)  // "1.50M"
-```
-
-For tier-based suffix patterns, extend `SuffixNotationBase`:
-
-```typescript
-import { SuffixNotationBase } from "arbitrary-numbers";
-
-class TierNotation extends SuffixNotationBase {
-    private static readonly TIERS = ["", "K", "M", "B", "T", "Qa", "Qi"];
-    getSuffix(tier: number): string {
-        return TierNotation.TIERS[tier] ?? `e+${tier * 3}`;
-    }
-}
-
-an(3.2, 6).toString(new TierNotation({ separator: " " }))  // "3.20 M"
-```
+---
 
 ## Idle game example
 
-A self-contained simulation showing hyper-growth, fused ops, helpers, and where plain JS `number` overflows while `ArbitraryNumber` keeps working.
+Full source: [`examples/idle-game.ts`](examples/idle-game.ts)
 
 ```typescript
 import {
     an,
-    UnitNotation, CLASSIC_UNITS, letterNotation,
+    UnitNotation, CLASSIC_UNITS, letterNotation, scientificNotation,
     ArbitraryNumberHelpers as helpers,
 } from "arbitrary-numbers";
-import type { ArbitraryNumber } from "arbitrary-numbers";
-
-let gold = an(5, 6);      // 5,000,000
-let gps  = an(2, 5);      // 200,000 per tick
-let reactorCost = an(1, 9);
-let reactors = 0;
 
 const display = new UnitNotation({ units: CLASSIC_UNITS, fallback: letterNotation });
+const fmt = (v) => v.exponent > 300
+    ? v.toString(scientificNotation)
+    : v.toString(display);
 
-function fmt(value: ArbitraryNumber, decimals = 2): string {
-    return value.toString(display, decimals);
-}
+let gold        = an(1, 0);
+let gps         = an(1, 0);
+let upgradeCost = an(1, 2);
+let upgrades    = 0;
 
-console.log("=== Hyper-growth idle loop (720 ticks) ===");
-console.log(`start gold=${fmt(gold)}  gps=${fmt(gps)}  reactorCost=${fmt(reactorCost)}`);
+for (let t = 1; t <= 350; t++) {
+    gold.mulAdd(an(1, 1), gps);  // gold = (gold × 10) + gps — fused, zero alloc
 
-for (let t = 1; t <= 720; t += 1) {
-    // Core growth: gold = (gold * 1.12) + gps  — fused, zero allocation
-    gold.mulAdd(an(1.12), gps);
-
-    if (t % 60 === 0 && helpers.meetsOrExceeds(gold, reactorCost)) {
-        const prevGps = gps.clone();
-        gold.sub(reactorCost);
-        gps.mul(an(1, 25)).floor();
-        reactorCost.mul(an(8));
-        reactors += 1;
-
-        console.log(
-            `[t=${String(t).padStart(4)}] REACTOR   #${String(reactors).padStart(2)}  `
-            + `gps ${fmt(prevGps)} -> ${fmt(gps)}  `
-            + `nextCost=${fmt(reactorCost)}`,
-        );
-    }
-
-    if (t === 240 || t === 480) {
-        const prevGps = gps.clone();
-        gps.mul(an(1, 4)).add(an(7.5, 6)).floor();
-        console.log(`[t=${String(t).padStart(4)}] PRESTIGE  gps ${fmt(prevGps)} -> ${fmt(gps)}`);
-    }
-
-    if (t % 120 === 0) {
-        console.log(
-            `[t=${String(t).padStart(4)}] SNAPSHOT  `
-            + `gold=${fmt(gold, 2).padStart(12)}  gps=${fmt(gps, 2).padStart(12)}`,
-        );
+    if (upgrades < 25 && helpers.meetsOrExceeds(gold, upgradeCost)) {
+        gold.sub(upgradeCost);
+        gps.mul(an(1, 3));
+        upgradeCost.mul(an(1, 6));
+        upgrades++;
     }
 }
-
-console.log("\n=== Final scale check ===");
-console.log(`reactors bought: ${reactors}`);
-console.log(`final gold (unit+letter): ${fmt(gold)}`);
-console.log(`final gps  (unit+letter): ${fmt(gps)}`);
-console.log(`final gold as JS Number: ${gold.toNumber()}`);
-console.log(`final gps as JS Number : ${gps.toNumber()}`);
-console.log("If JS shows Infinity while unit+letter output stays finite, the library is doing its job.");
 ```
+
+Output (selected lines):
+
+```
+=== Idle game simulation (350 ticks) ===
+start  gold=1.00  gps=1.00  upgradeCost=100.00
+
+[t=  2] UPGRADE # 1  gps       1.00 →     1.00 K   next cost: 1.00e+8
+[t=  8] UPGRADE # 2  gps     1.00 K →     1.00 M   next cost: 1.00e+14
+[t= 15] UPGRADE # 3  gps     1.00 M →     1.00 B   next cost: 1.00e+20
+...
+[t= 67] UPGRADE #11  gps    1.00 No →    1.00 Dc   next cost: 1.00e+68
+[t= 70] snapshot  AN:        112.22 Vg   JS: 1.12e+65
+[t= 80] UPGRADE #13  gps   1.00 UDc →   1.00 DDc   next cost: 1.00e+80
+...
+[t=140] snapshot  AN:             1.21   JS: 1.21e+129
+[t=280] snapshot  AN:             1.22   JS: 1.22e+267
+[t=350] snapshot  AN:        1.22e+337   JS: Infinity  ← beyond float64 max!
+
+=== Final state ===
+Upgrades bought : 25
+Final gold (AN) : 1.22e+337
+Gold as JS num  : Infinity
+```
+
+JS overflows at `~1e308`. ArbitraryNumber keeps tracking the exact value.
+
+> **Note on `UnitNotation` display:** `CLASSIC_UNITS` only defines specific named illion tiers (K, M, B, T … Ct). Values at exponents between named tiers will show as a plain decimal. For fully continuous display across all exponents, use `letterNotation` or `scientificNotation` as the primary formatter.
+
+---
 
 ## Performance
 
-Benchmarks are in [`benchmarks/`](benchmarks/). Competitor comparison: [`benchmarks/COMPETITOR_BENCHMARKS.md`](benchmarks/COMPETITOR_BENCHMARKS.md).
+Benchmarks: [`benchmarks/`](benchmarks/). Competitor comparison: [`benchmarks/COMPETITOR_BENCHMARKS.md`](benchmarks/COMPETITOR_BENCHMARKS.md).
 
-Quick reference (Node 22.16, Intel i5-13600KF):
+Node 22.16, Intel i5-13600KF:
 
-| Operation | v2.0 per-op | v1.1 per-op |
+| Operation | v2.0 | v1.1 |
 |---|---|---|
-| `new ArbitraryNumber(c, e)` | ~14 ns | ~13.5 ns |
-| `clone()` | ~4.7 ns | ~13.5 ns |
-| `add` / `sub` (pure op) | ~30 ns | ~270 ns |
-| `mul` | ~15 ns | ~255 ns |
-| `div` | ~15 ns | ~255 ns |
-| `sqrt()` | ~8 ns | ~252 ns |
-| `compareTo` | ~3 ns | ~3 ns |
-| `sumArray(50 items)` | ~180 ns (~3.6 ns/elem) | N/A |
-| idle tick (4-op chain) | ~42 ns | N/A |
-| prestige loop `mulAdd` per-iter | ~33 ns | N/A |
+| `new ArbitraryNumber(c, e)` | ~15.6 ns | ~13.5 ns |
+| `clone()` | **~6.7 ns** | ~13.5 ns |
+| `add` / `sub` | **~13 ns** | ~270 ns |
+| `mul` / `div` | **~11–12 ns** | ~255 ns |
+| `sqrt()` | **~11 ns** | ~252 ns |
+| `compareTo` | ~3.6 ns | ~3 ns |
+| `sumArray(50)` | **~156 ns** (~3.1 ns/elem) | N/A |
+
+v2 arithmetic is **20× faster than v1** — the v1 `Object.create` path cost ~250 ns per result regardless of the math. v2 mutates in-place: steady-state ops are pure float arithmetic with zero allocation.
+
+---
 
 ## Migration from v1
 
 | v1 | v2 | Notes |
 |---|---|---|
-| `a.add(b)` → new instance | `a.add(b)` → mutates `a`, returns `a` | **Breaking.** Use `a.clone().add(b)` to keep v1 semantics. |
-| `chain(a).add(b).done()` | `a.add(b)` | Delete `chain`. Direct chaining is native now. |
-| `formula(fn).apply(a)` | `formula(fn).apply(a)` | Unchanged. Input is cloned internally. |
-| — | `formula(fn).applyInPlace(a)` | New. Mutates `a` directly — no clone. |
-| `ArbitraryNumber.PrecisionCutoff = 15` | `ArbitraryNumber.defaults.scaleCutoff = 15` | Renamed + namespaced. |
-| `ops.add(x, y)` | `ArbitraryNumber.add(x, y)` | Static on main class. `ops` class removed. |
-| `ops.from(x)` / `ops.tryFrom(x)` | `ArbitraryNumber.from(x)` / `.tryFrom(x)` | Same. |
+| `a.add(b)` → new instance | `a.add(b)` → mutates `a` | **Breaking.** Use `a.clone().add(b)` to keep old semantics. |
+| `chain(a).add(b).done()` | `a.add(b)` | `chain` removed — direct chaining is native. |
+| `formula(fn).apply(a)` | `formula().step1().step2().apply(a)` | Builder pattern replaces the callback. |
+| `ArbitraryNumber.PrecisionCutoff` | `ArbitraryNumber.defaults.scaleCutoff` | Renamed + namespaced. |
+| `ops.add(x, y)` | `ArbitraryNumber.add(x, y)` | Static on main class. |
 | `ArbitraryNumberOps` export | removed | — |
-| `ArbitraryNumberArithmetic` export | removed | Internalized. |
-| `NormalizedNumber` export | removed | Leaked internal shape. |
-| `AnChain`, `chain()` export | removed | Redundant — direct chaining is native. |
+| `ArbitraryNumberArithmetic` export | removed | — |
+| `NormalizedNumber` export | removed | — |
+| `AnChain`, `chain()` export | removed | — |
+| `a.toRaw()` | `a.toRawString()` | Renamed for clarity. |
 | `a.freeze()` | new | Returns `FrozenArbitraryNumber`. |
-| `ArbitraryNumber.Zero.add(...)` | throws `ArbitraryNumberMutationError` | Use `an(0).add(...)` instead. |
+| `ArbitraryNumber.Zero.add(...)` | throws `ArbitraryNumberMutationError` | Use `an(0).add(...)`. |
